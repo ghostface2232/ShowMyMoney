@@ -1,8 +1,9 @@
-// 홈 대시보드 진입점. 세션 검증 후 대시보드 데이터와 목표 리스트를 SSR로 받아 헤더/요약/테이블에 주입한다.
+// 홈 대시보드 진입점. 세션 검증 후 대시보드 데이터와 목표·프로필 메타를 SSR로 받아 헤더/요약/테이블에 주입한다.
 import { redirect } from "next/navigation";
 
 import { getDashboardData } from "@/actions/dashboard";
 import { listGoals } from "@/actions/goals";
+import { getProfile } from "@/actions/profile";
 import { AppHeader } from "@/components/app-header";
 import { AssetTable } from "@/components/asset-table";
 import { SummaryCards } from "@/components/summary-cards";
@@ -14,9 +15,10 @@ export default async function HomePage() {
     redirect("/login");
   }
 
-  const [dashboard, goals] = await Promise.all([
+  const [dashboard, goals, profile] = await Promise.all([
     getDashboardData(),
     listGoals(),
+    getProfile(),
   ]);
 
   const latest = dashboard.snapshots[0];
@@ -31,7 +33,8 @@ export default async function HomePage() {
   return (
     <>
       <AppHeader
-        displayName={session.displayName}
+        displayName={profile.displayName}
+        firstUsedAt={profile.firstUsedAt}
         snapshots={dashboard.snapshots.map((snapshot) => ({
           id: snapshot.id,
           year_month: snapshot.year_month,
