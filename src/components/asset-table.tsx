@@ -259,7 +259,7 @@ function GroupSection({
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4 px-1">
         <div className="flex min-w-0 items-center gap-1">
-          <h2 className="truncate px-1 text-sm font-semibold">{group.name}</h2>
+          <h2 className="truncate px-1 text-2xl font-semibold">{group.name}</h2>
           <GroupManagementDialog
             group={group}
             disabled={pending}
@@ -349,6 +349,10 @@ function GroupManagementDialog({
   const [deleteTarget, setDeleteTarget] = useState<GroupDeleteTarget | null>(
     null,
   );
+  const reducedMotion = useReducedMotion();
+  const transition: Transition = reducedMotion
+    ? { duration: 0 }
+    : { type: "spring", stiffness: 280, damping: 32 };
 
   async function saveGroupName(value: string) {
     const trimmed = value.trim();
@@ -411,45 +415,18 @@ function GroupManagementDialog({
         </DialogTrigger>
         <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{group.name} 관리</DialogTitle>
+            <EditableDialogTitle
+              value={group.name}
+              disabled={disabled}
+              onSave={saveGroupName}
+            />
           </DialogHeader>
 
-          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
-            <section className="space-y-2">
-              <label
-                htmlFor={`group-name-${group.id}`}
-                className="text-xs font-medium text-muted-foreground"
-              >
-                그룹 이름
-              </label>
-              <div className="flex items-center gap-2">
-                <Input
-                  key={group.name}
-                  id={`group-name-${group.id}`}
-                  defaultValue={group.name}
-                  onBlur={(event) => {
-                    if (!event.currentTarget.value.trim()) {
-                      event.currentTarget.value = group.name;
-                      return;
-                    }
-                    saveGroupName(event.currentTarget.value);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      event.currentTarget.blur();
-                    } else if (event.key === "Escape") {
-                      event.preventDefault();
-                      event.currentTarget.value = group.name;
-                      event.currentTarget.blur();
-                    }
-                  }}
-                  disabled={disabled}
-                  maxLength={40}
-                />
-              </div>
-            </section>
-
+          <motion.div
+            layout
+            transition={transition}
+            className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1"
+          >
             <section className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-xs font-medium text-muted-foreground">
@@ -461,34 +438,44 @@ function GroupManagementDialog({
               </div>
 
               {group.categories.length > 0 ? (
-                <ul className="divide-y">
-                  {group.categories.map((category, index) => (
-                    <GroupCategoryRow
-                      key={category.id}
-                      category={category}
-                      disabled={disabled}
-                      canMoveUp={index > 0}
-                      canMoveDown={index < group.categories.length - 1}
-                      onRename={(name) =>
-                        runAction(() => renameCategory(category.id, name))
-                      }
-                      onMove={(direction) =>
-                        moveCategory(category.id, direction)
-                      }
-                      onDelete={() =>
-                        setDeleteTarget({
-                          kind: "category",
-                          id: category.id,
-                          name: category.name,
-                        })
-                      }
-                    />
-                  ))}
-                </ul>
+                <motion.ul layout transition={transition} className="divide-y">
+                  <AnimatePresence initial={false}>
+                    {group.categories.map((category, index) => (
+                      <GroupCategoryRow
+                        key={category.id}
+                        category={category}
+                        disabled={disabled}
+                        canMoveUp={index > 0}
+                        canMoveDown={index < group.categories.length - 1}
+                        transition={transition}
+                        onRename={(name) =>
+                          runAction(() => renameCategory(category.id, name))
+                        }
+                        onMove={(direction) =>
+                          moveCategory(category.id, direction)
+                        }
+                        onDelete={() =>
+                          setDeleteTarget({
+                            kind: "category",
+                            id: category.id,
+                            name: category.name,
+                          })
+                        }
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.ul>
               ) : (
-                <div className="rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground">
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={transition}
+                  className="rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground"
+                >
                   아직 항목이 없습니다.
-                </div>
+                </motion.div>
               )}
 
               <div className="flex items-center gap-2 pt-1">
@@ -519,33 +506,26 @@ function GroupManagementDialog({
               </div>
             </section>
 
-            <section className="rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-destructive">
-                    그룹 삭제
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  disabled={disabled}
-                  onClick={() =>
-                    setDeleteTarget({
-                      kind: "group",
-                      id: group.id,
-                      name: group.name,
-                      categoryCount: group.categories.length,
-                    })
-                  }
-                >
-                  <Trash2 className="size-4" />
-                  삭제
-                </Button>
-              </div>
-            </section>
-          </div>
+            <div className="flex justify-end pt-1">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={disabled}
+                onClick={() =>
+                  setDeleteTarget({
+                    kind: "group",
+                    id: group.id,
+                    name: group.name,
+                    categoryCount: group.categories.length,
+                  })
+                }
+              >
+                <Trash2 className="size-4" />
+                그룹 삭제
+              </Button>
+            </div>
+          </motion.div>
         </DialogContent>
       </Dialog>
 
@@ -579,6 +559,7 @@ function GroupCategoryRow({
   disabled,
   canMoveUp,
   canMoveDown,
+  transition,
   onRename,
   onMove,
   onDelete,
@@ -587,6 +568,7 @@ function GroupCategoryRow({
   disabled: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  transition: Transition;
   onRename: (name: string) => void;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
@@ -600,7 +582,14 @@ function GroupCategoryRow({
   }
 
   return (
-    <li className="flex items-center gap-1 px-2 py-2">
+    <motion.li
+      layout
+      initial={{ opacity: 0, height: 0, y: -6 }}
+      animate={{ opacity: 1, height: "auto", y: 0 }}
+      exit={{ opacity: 0, height: 0, y: -6 }}
+      transition={transition}
+      className="flex items-center gap-1 overflow-hidden px-2 py-2"
+    >
       <Input
         key={category.name}
         defaultValue={category.name}
@@ -656,7 +645,77 @@ function GroupCategoryRow({
       >
         <Trash2 className="size-4" />
       </Button>
-    </li>
+    </motion.li>
+  );
+}
+
+function EditableDialogTitle({
+  value,
+  disabled,
+  onSave,
+}: {
+  value: string;
+  disabled: boolean;
+  onSave: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  function start() {
+    if (disabled) return;
+    setDraft(value);
+    setEditing(true);
+  }
+
+  function commit() {
+    const trimmed = draft.trim();
+    setEditing(false);
+    setDraft("");
+    if (!trimmed || trimmed === value) return;
+    onSave(trimmed);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraft("");
+  }
+
+  if (editing) {
+    return (
+      <DialogTitle asChild>
+        <input
+          autoFocus
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit();
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              cancel();
+            }
+          }}
+          disabled={disabled}
+          maxLength={40}
+          className="w-2/3 min-w-0 rounded bg-transparent px-1 text-3xl font-semibold outline-none"
+        />
+      </DialogTitle>
+    );
+  }
+
+  return (
+    <DialogTitle asChild>
+      <button
+        type="button"
+        onClick={start}
+        disabled={disabled}
+        className="max-w-[66%] min-w-0 truncate rounded px-1 text-left text-3xl font-semibold transition-colors hover:bg-muted/40 disabled:opacity-50"
+      >
+        {value}
+      </button>
+    </DialogTitle>
   );
 }
 

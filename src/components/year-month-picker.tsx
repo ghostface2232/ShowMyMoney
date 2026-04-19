@@ -76,7 +76,7 @@ export function YearMonthPicker({
               <Button
                 key={month}
                 type="button"
-                variant={exists ? "secondary" : "outline"}
+                variant={exists ? "default" : "outline"}
                 size="sm"
                 className="h-9"
                 disabled={!selectable}
