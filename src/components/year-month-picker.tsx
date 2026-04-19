@@ -16,11 +16,18 @@ type Props = {
   existing: Set<number>;
   onSelect: (yearMonth: number) => void;
   disabled?: boolean;
+  existingMode?: "disabled" | "selectable";
 };
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
-export function YearMonthPicker({ trigger, existing, onSelect, disabled }: Props) {
+export function YearMonthPicker({
+  trigger,
+  existing,
+  onSelect,
+  disabled,
+  existingMode = "disabled",
+}: Props) {
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(() => new Date().getFullYear());
 
@@ -64,14 +71,16 @@ export function YearMonthPicker({ trigger, existing, onSelect, disabled }: Props
         <div className="grid grid-cols-3 gap-2">
           {MONTHS.map((month) => {
             const exists = existing.has(year * 100 + month);
+            const selectable = !exists || existingMode === "selectable";
             return (
               <Button
                 key={month}
                 type="button"
-                variant="outline"
+                variant={exists ? "secondary" : "outline"}
                 size="sm"
                 className="h-9"
-                disabled={exists}
+                disabled={!selectable}
+                aria-pressed={exists}
                 onClick={() => pick(month)}
               >
                 {month}월

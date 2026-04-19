@@ -2,7 +2,6 @@
 "use client";
 
 import {
-  useEffect,
   useState,
   useTransition,
   type FormEvent,
@@ -66,10 +65,6 @@ export function CategoryEditorSheet({ initialTree }: Props) {
   const [tree, setTree] = useState<CategoryGroupWithCategories[]>(initialTree);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setTree(initialTree);
-  }, [initialTree]);
 
   function runAction(action: () => Promise<ActionResult>) {
     startTransition(async () => {
@@ -421,11 +416,7 @@ function EditableName({
   textClassName?: string;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
+  const [draft, setDraft] = useState("");
 
   function commit() {
     const trimmed = draft.trim();
@@ -433,7 +424,7 @@ function EditableName({
       onSave(trimmed);
     }
     setEditing(false);
-    setDraft(value);
+    setDraft("");
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -443,7 +434,7 @@ function EditableName({
     } else if (event.key === "Escape") {
       event.preventDefault();
       setEditing(false);
-      setDraft(value);
+      setDraft("");
     }
   }
 
@@ -472,7 +463,10 @@ function EditableName({
         variant="ghost"
         size="icon-xs"
         disabled={disabled}
-        onClick={() => setEditing(true)}
+        onClick={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
         aria-label="이름 변경"
       >
         <Pencil className="size-3" />

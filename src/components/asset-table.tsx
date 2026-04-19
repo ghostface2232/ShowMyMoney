@@ -1,4 +1,4 @@
-// 월별 자산 테이블. 그룹/항목 인라인 편집, 스냅샷·엔트리 CRUD, 그룹 추가를 한 화면에서 수행한다.
+// 월별 자산 테이블. 그룹별 항목 관리 모달과 금액 입력을 한 화면에서 수행한다.
 "use client";
 
 import {
@@ -15,7 +15,13 @@ import {
   useReducedMotion,
   type Transition,
 } from "motion/react";
-import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -25,6 +31,7 @@ import {
   deleteGroup,
   renameCategory,
   renameGroup,
+  reorderCategories,
   type CategoryGroupWithCategories,
 } from "@/actions/categories";
 import type {
@@ -32,7 +39,7 @@ import type {
   SnapshotWithEntries,
 } from "@/actions/dashboard";
 import { deleteEntry, upsertEntry } from "@/actions/entries";
-import { createSnapshot, deleteSnapshot } from "@/actions/snapshots";
+import { createSnapshot } from "@/actions/snapshots";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,13 +53,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { YearMonthPicker } from "@/components/year-month-picker";
 import { formatKRW, formatYearMonth } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { Category } from "@/types/db";
 
 type Props = {
@@ -61,17 +70,15 @@ type Props = {
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
-type DeleteTarget =
-  | { kind: "group"; id: string; name: string; categoryCount: number }
-  | { kind: "category"; id: string; name: string }
-  | { kind: "snapshot"; snapshot: SnapshotWithEntries };
-
 type RunAction = (action: () => Promise<ActionResult>) => Promise<void>;
+
+type GroupDeleteTarget =
+  | { kind: "group"; id: string; name: string; categoryCount: number }
+  | { kind: "category"; id: string; name: string };
 
 export function AssetTable({ dashboard }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [addingGroup, setAddingGroup] = useState(false);
 
   const reducedMotion = useReducedMotion();
@@ -103,22 +110,6 @@ export function AssetTable({ dashboard }: Props) {
     await runAction(() => createSnapshot(yearMonth));
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    const target = deleteTarget;
-    setDeleteTarget(null);
-    await runAction(() => {
-      switch (target.kind) {
-        case "group":
-          return deleteGroup(target.id);
-        case "category":
-          return deleteCategory(target.id);
-        case "snapshot":
-          return deleteSnapshot(target.snapshot.id);
-      }
-    });
-  }
-
   const hasSnapshots = dashboard.snapshots.length > 0;
   const hasGroups = dashboard.categoryTree.length > 0;
 
@@ -135,7 +126,6 @@ export function AssetTable({ dashboard }: Props) {
                 pending={pending}
                 transition={transition}
                 runAction={runAction}
-                onRequestDelete={setDeleteTarget}
               />
             ))
           ) : (
@@ -155,53 +145,8 @@ export function AssetTable({ dashboard }: Props) {
           disabled={pending}
         />
       )}
-
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(next) => {
-          if (!next) setDeleteTarget(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{getDeleteTitle(deleteTarget)}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {getDeleteMessage(deleteTarget)}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>삭제</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
-}
-
-function getDeleteTitle(target: DeleteTarget | null): string {
-  switch (target?.kind) {
-    case "group":
-      return "그룹 삭제";
-    case "category":
-      return "항목 삭제";
-    case "snapshot":
-      return "월 기록 삭제";
-    default:
-      return "";
-  }
-}
-
-function getDeleteMessage(target: DeleteTarget | null): string {
-  if (!target) return "";
-  switch (target.kind) {
-    case "group":
-      return `"${target.name}" 그룹과 하위 ${target.categoryCount}개 항목, 그리고 관련된 모든 금액 기록이 삭제됩니다.`;
-    case "category":
-      return `"${target.name}" 항목과 관련된 모든 금액 기록이 삭제됩니다.`;
-    case "snapshot":
-      return `${formatYearMonth(target.snapshot.year_month)}의 모든 금액 기록이 삭제됩니다.`;
-  }
 }
 
 function EmptyState({
@@ -291,7 +236,6 @@ type GroupSectionProps = {
   pending: boolean;
   transition: Transition;
   runAction: RunAction;
-  onRequestDelete: (target: DeleteTarget) => void;
 };
 
 function GroupSection({
@@ -300,10 +244,7 @@ function GroupSection({
   pending,
   transition,
   runAction,
-  onRequestDelete,
 }: GroupSectionProps) {
-  const [addingCategory, setAddingCategory] = useState(false);
-
   const latest = snapshots[0];
   const latestSum = useMemo(() => {
     if (!latest) return 0;
@@ -318,23 +259,11 @@ function GroupSection({
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4 px-1">
         <div className="flex min-w-0 items-center gap-1">
-          <EditableText
-            value={group.name}
-            onSave={(next) => runAction(() => renameGroup(group.id, next))}
+          <h2 className="truncate px-1 text-sm font-semibold">{group.name}</h2>
+          <GroupManagementDialog
+            group={group}
             disabled={pending}
-            textClassName="text-sm font-semibold"
-          />
-          <InlineDeleteButton
-            disabled={pending}
-            onClick={() =>
-              onRequestDelete({
-                kind: "group",
-                id: group.id,
-                name: group.name,
-                categoryCount: group.categories.length,
-              })
-            }
-            label="그룹 삭제"
+            runAction={runAction}
           />
         </div>
         <div className="shrink-0 text-sm tabular-nums">
@@ -345,13 +274,9 @@ function GroupSection({
 
       <Card className="p-4 shadow-none ring-0">
         <div className="overflow-x-auto">
-          <div className="flex min-w-fit">
-            <NameColumn
-              categories={group.categories}
-              disabled={pending}
-              runAction={runAction}
-              onRequestDelete={onRequestDelete}
-            />
+          <div className="relative flex min-w-fit">
+            <TableRowDividers rowCount={group.categories.length} />
+            <NameColumn categories={group.categories} />
             <AnimatePresence mode="popLayout" initial={false}>
               {snapshots.map((snap) => (
                 <SnapshotColumn
@@ -361,87 +286,386 @@ function GroupSection({
                   disabled={pending}
                   runAction={runAction}
                   transition={transition}
-                  onDelete={() =>
-                    onRequestDelete({ kind: "snapshot", snapshot: snap })
-                  }
                 />
               ))}
             </AnimatePresence>
           </div>
         </div>
       </Card>
-
-      <div className="px-1">
-        {addingCategory ? (
-          <InlineNameInput
-            placeholder="새 항목 이름"
-            disabled={pending}
-            onCancel={() => setAddingCategory(false)}
-            onSave={(name) => {
-              setAddingCategory(false);
-              runAction(() => createCategory(group.id, name));
-            }}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAddingCategory(true)}
-            disabled={pending}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-          >
-            <Plus className="size-3.5" />
-            항목 추가
-          </button>
-        )}
-      </div>
     </section>
   );
 }
 
 type NameColumnProps = {
   categories: Category[];
-  disabled: boolean;
-  runAction: RunAction;
-  onRequestDelete: (target: DeleteTarget) => void;
 };
 
-function NameColumn({
-  categories,
-  disabled,
-  runAction,
-  onRequestDelete,
-}: NameColumnProps) {
+function NameColumn({ categories }: NameColumnProps) {
   return (
-    <div className="sticky left-0 z-10 flex shrink-0 flex-col bg-card pr-6">
-      <div className="h-10 border-b" />
-      {categories.map((cat, i) => (
+    <div
+      className="sticky left-0 z-10 flex shrink-0 flex-col bg-card"
+      style={{ width: 48, minWidth: 48, maxWidth: 48, flexBasis: 48 }}
+    >
+      <div className="h-10" />
+      {categories.map((cat) => (
         <div
           key={cat.id}
-          className={cn(
-            "flex h-11 items-center gap-1 text-sm",
-            i < categories.length - 1 && "border-b",
-          )}
+          className="flex h-11 min-w-0 items-center text-sm"
         >
-          <EditableText
-            value={cat.name}
-            onSave={(next) => runAction(() => renameCategory(cat.id, next))}
-            disabled={disabled}
-          />
-          <InlineDeleteButton
-            disabled={disabled}
-            onClick={() =>
-              onRequestDelete({
-                kind: "category",
-                id: cat.id,
-                name: cat.name,
-              })
-            }
-            label="항목 삭제"
-          />
+          <span className="block min-w-0 truncate px-1">{cat.name}</span>
         </div>
       ))}
     </div>
   );
+}
+
+function TableRowDividers({ rowCount }: { rowCount: number }) {
+  const lineCount = Math.max(rowCount, 1);
+
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-20">
+      {Array.from({ length: lineCount }, (_, index) => (
+        <span
+          key={index}
+          className="absolute inset-x-0 border-t"
+          style={{ top: 40 + index * 44 }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function GroupManagementDialog({
+  group,
+  disabled,
+  runAction,
+}: {
+  group: CategoryGroupWithCategories;
+  disabled: boolean;
+  runAction: RunAction;
+}) {
+  const [open, setOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<GroupDeleteTarget | null>(
+    null,
+  );
+
+  async function saveGroupName(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+    if (trimmed === group.name) return;
+    await runAction(() => renameGroup(group.id, trimmed));
+  }
+
+  async function addCategory() {
+    const trimmed = newCategory.trim();
+    if (!trimmed) return;
+    setNewCategory("");
+    await runAction(() => createCategory(group.id, trimmed));
+  }
+
+  async function moveCategory(categoryId: string, direction: -1 | 1) {
+    const index = group.categories.findIndex((cat) => cat.id === categoryId);
+    const next = index + direction;
+    if (index === -1 || next < 0 || next >= group.categories.length) return;
+    const reordered = [...group.categories];
+    [reordered[index], reordered[next]] = [reordered[next], reordered[index]];
+    await runAction(() =>
+      reorderCategories(
+        group.id,
+        reordered.map((cat) => cat.id),
+      ),
+    );
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+
+    if (target.kind === "group") {
+      setOpen(false);
+      await runAction(() => deleteGroup(target.id));
+      return;
+    }
+
+    await runAction(() => deleteCategory(target.id));
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={disabled}
+            className="text-muted-foreground"
+            aria-label={`${group.name} 관리`}
+          >
+            <MoreHorizontal className="size-3.5" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{group.name} 관리</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
+            <section className="space-y-2">
+              <label
+                htmlFor={`group-name-${group.id}`}
+                className="text-xs font-medium text-muted-foreground"
+              >
+                그룹 이름
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  key={group.name}
+                  id={`group-name-${group.id}`}
+                  defaultValue={group.name}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.value.trim()) {
+                      event.currentTarget.value = group.name;
+                      return;
+                    }
+                    saveGroupName(event.currentTarget.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    } else if (event.key === "Escape") {
+                      event.preventDefault();
+                      event.currentTarget.value = group.name;
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  disabled={disabled}
+                  maxLength={40}
+                />
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-xs font-medium text-muted-foreground">
+                  항목
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  {group.categories.length}개
+                </span>
+              </div>
+
+              {group.categories.length > 0 ? (
+                <ul className="divide-y">
+                  {group.categories.map((category, index) => (
+                    <GroupCategoryRow
+                      key={category.id}
+                      category={category}
+                      disabled={disabled}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < group.categories.length - 1}
+                      onRename={(name) =>
+                        runAction(() => renameCategory(category.id, name))
+                      }
+                      onMove={(direction) =>
+                        moveCategory(category.id, direction)
+                      }
+                      onDelete={() =>
+                        setDeleteTarget({
+                          kind: "category",
+                          id: category.id,
+                          name: category.name,
+                        })
+                      }
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground">
+                  아직 항목이 없습니다.
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <Input
+                  value={newCategory}
+                  onChange={(event) => setNewCategory(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addCategory();
+                    }
+                  }}
+                  placeholder="새 항목 이름"
+                  disabled={disabled}
+                  maxLength={40}
+                  className="h-8"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addCategory}
+                  disabled={disabled || newCategory.trim().length === 0}
+                >
+                  <Plus className="size-4" />
+                  추가
+                </Button>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-destructive/20 bg-destructive/5 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-destructive">
+                    그룹 삭제
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={() =>
+                    setDeleteTarget({
+                      kind: "group",
+                      id: group.id,
+                      name: group.name,
+                      categoryCount: group.categories.length,
+                    })
+                  }
+                >
+                  <Trash2 className="size-4" />
+                  삭제
+                </Button>
+              </div>
+            </section>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteTarget?.kind === "group" ? "그룹 삭제" : "항목 삭제"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {getGroupDeleteMessage(deleteTarget)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>삭제</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function GroupCategoryRow({
+  category,
+  disabled,
+  canMoveUp,
+  canMoveDown,
+  onRename,
+  onMove,
+  onDelete,
+}: {
+  category: Category;
+  disabled: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onRename: (name: string) => void;
+  onMove: (direction: -1 | 1) => void;
+  onDelete: () => void;
+}) {
+  function commit(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+    if (trimmed !== category.name) onRename(trimmed);
+  }
+
+  return (
+    <li className="flex items-center gap-1 px-2 py-2">
+      <Input
+        key={category.name}
+        defaultValue={category.name}
+        onBlur={(event) => {
+          if (!event.currentTarget.value.trim()) {
+            event.currentTarget.value = category.name;
+            return;
+          }
+          commit(event.currentTarget.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            event.currentTarget.value = category.name;
+            event.currentTarget.blur();
+          }
+        }}
+        disabled={disabled}
+        maxLength={40}
+        className="h-8 border-transparent bg-transparent px-1 shadow-none focus-visible:bg-input/50 focus-visible:ring-0"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        disabled={disabled || !canMoveUp}
+        onClick={() => onMove(-1)}
+        aria-label={`${category.name} 위로 이동`}
+      >
+        <ChevronUp className="size-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        disabled={disabled || !canMoveDown}
+        onClick={() => onMove(1)}
+        aria-label={`${category.name} 아래로 이동`}
+      >
+        <ChevronDown className="size-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        disabled={disabled}
+        onClick={onDelete}
+        className="text-muted-foreground hover:text-destructive"
+        aria-label={`${category.name} 삭제`}
+      >
+        <Trash2 className="size-4" />
+      </Button>
+    </li>
+  );
+}
+
+function getGroupDeleteMessage(target: GroupDeleteTarget | null): string {
+  if (!target) return "";
+  if (target.kind === "group") {
+    return `"${target.name}" 그룹과 하위 ${target.categoryCount}개 항목, 그리고 관련된 모든 금액 기록이 삭제됩니다.`;
+  }
+  return `"${target.name}" 항목과 관련된 모든 금액 기록이 삭제됩니다.`;
 }
 
 type SnapshotColumnProps = {
@@ -450,7 +674,6 @@ type SnapshotColumnProps = {
   disabled: boolean;
   runAction: RunAction;
   transition: Transition;
-  onDelete: () => void;
 };
 
 function SnapshotColumn({
@@ -459,52 +682,23 @@ function SnapshotColumn({
   disabled,
   runAction,
   transition,
-  onDelete,
 }: SnapshotColumnProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   return (
     <motion.div
       layout
       transition={transition}
       initial={{ opacity: 0, width: 0 }}
-      animate={{ opacity: 1, width: "auto" }}
+      animate={{ opacity: 1, width: 120 }}
       exit={{ opacity: 0, width: 0 }}
-      className="flex shrink-0 flex-col overflow-hidden pl-6"
+      className="z-10 flex w-30 shrink-0 flex-col overflow-hidden pl-3"
     >
-      <div className="flex h-10 items-center justify-end gap-0.5 border-b text-xs font-medium text-muted-foreground">
-        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="text-muted-foreground"
-              aria-label="이 달 메뉴"
-            >
-              <MoreHorizontal className="size-3.5" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-40 p-1" align="end">
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                onDelete();
-              }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
-            >
-              <Trash2 className="size-3.5" />
-              이 달 삭제
-            </button>
-          </PopoverContent>
-        </Popover>
-        <span className="truncate pr-1">
+      <div className="flex h-10 items-center justify-end text-xs font-medium text-muted-foreground">
+        <span className="truncate px-1">
           {formatYearMonth(snapshot.year_month)}
         </span>
       </div>
 
-      {categories.map((cat, i) => (
+      {categories.map((cat) => (
         <AmountCell
           key={cat.id}
           snapshotId={snapshot.id}
@@ -512,7 +706,6 @@ function SnapshotColumn({
           entry={snapshot.entriesByCategory[cat.id]}
           disabled={disabled}
           runAction={runAction}
-          isLast={i === categories.length - 1}
         />
       ))}
     </motion.div>
@@ -525,7 +718,6 @@ type AmountCellProps = {
   entry: SnapshotWithEntries["entriesByCategory"][string] | undefined;
   disabled: boolean;
   runAction: RunAction;
-  isLast: boolean;
 };
 
 function AmountCell({
@@ -534,7 +726,6 @@ function AmountCell({
   entry,
   disabled,
   runAction,
-  isLast,
 }: AmountCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -567,16 +758,9 @@ function AmountCell({
     await runAction(() => deleteEntry(entry.id));
   }
 
-  const borderClass = isLast ? "" : "border-b";
-
   if (editing) {
     return (
-      <div
-        className={cn(
-          "flex h-11 items-center gap-0.5 px-1 ring-1 ring-ring/60 ring-inset",
-          borderClass,
-        )}
-      >
+      <div className="flex h-11 w-full items-center gap-0.5 px-1 ring-1 ring-ring/60 ring-inset">
         <input
           autoFocus
           inputMode="numeric"
@@ -594,7 +778,7 @@ function AmountCell({
             }
           }}
           placeholder="0"
-          className="h-8 flex-1 bg-transparent px-2 text-right text-sm tabular-nums focus:outline-none"
+          className="h-8 min-w-0 flex-1 bg-transparent px-2 text-right text-sm tabular-nums focus:outline-none"
         />
         {entry ? (
           <Button
@@ -618,10 +802,7 @@ function AmountCell({
       type="button"
       onClick={start}
       disabled={disabled}
-      className={cn(
-        "flex h-11 items-center justify-end px-3 text-right text-sm tabular-nums transition-colors hover:bg-muted/40 disabled:opacity-60",
-        borderClass,
-      )}
+      className="flex h-11 w-full items-center justify-end px-3 text-right text-sm tabular-nums transition-colors hover:bg-muted/40 disabled:opacity-60"
     >
       {amount !== null ? (
         formatKRW(amount)
@@ -629,106 +810,6 @@ function AmountCell({
         <span className="text-muted-foreground/60">—</span>
       )}
     </button>
-  );
-}
-
-function EditableText({
-  value,
-  onSave,
-  disabled,
-  textClassName,
-}: {
-  value: string;
-  onSave: (next: string) => void;
-  disabled: boolean;
-  textClassName?: string;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  function start() {
-    if (disabled) return;
-    setDraft(value);
-    setEditing(true);
-  }
-
-  function commit() {
-    const trimmed = draft.trim();
-    setEditing(false);
-    if (!trimmed || trimmed === value) return;
-    onSave(trimmed);
-  }
-
-  function cancel() {
-    setEditing(false);
-    setDraft(value);
-  }
-
-  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      commit();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      cancel();
-    }
-  }
-
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        type="text"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={onKeyDown}
-        disabled={disabled}
-        maxLength={40}
-        className={cn(
-          "rounded bg-transparent px-1 text-left outline-none ring-1 ring-ring/60 ring-inset",
-          textClassName,
-        )}
-      />
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={start}
-      disabled={disabled}
-      className={cn(
-        "max-w-full truncate rounded px-1 text-left transition-colors hover:bg-muted/40 disabled:opacity-50",
-        textClassName,
-      )}
-    >
-      {value}
-    </button>
-  );
-}
-
-function InlineDeleteButton({
-  disabled,
-  onClick,
-  label,
-}: {
-  disabled: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      onClick={onClick}
-      disabled={disabled}
-      className="shrink-0 text-muted-foreground/50 transition-colors hover:text-destructive"
-      aria-label={label}
-    >
-      <Trash2 className="size-3.5" />
-    </Button>
   );
 }
 

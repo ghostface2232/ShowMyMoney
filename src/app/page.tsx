@@ -19,7 +19,10 @@ export default async function HomePage() {
     <>
       <AppHeader
         displayName={session.displayName}
-        existingYearMonths={dashboard.snapshots.map((s) => s.year_month)}
+        snapshots={dashboard.snapshots.map((snapshot) => ({
+          id: snapshot.id,
+          year_month: snapshot.year_month,
+        }))}
       />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8">
         <SummaryCards />
