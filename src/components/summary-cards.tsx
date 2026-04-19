@@ -1,12 +1,24 @@
-// 헤더 아래의 가로 요약 카드 스트립. 현재는 빈 플레이스홀더 4개만 렌더한다.
+// 헤더 아래의 요약 스트립. 하나의 가로 Card를 4열로 나누고 열 사이에 상하 여백을 둔 얇은 구분선을 둔다.
+import { Fragment } from "react";
+
 import { Card } from "@/components/ui/card";
+
+const COLUMN_COUNT = 4;
 
 export function SummaryCards() {
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-      {Array.from({ length: 4 }, (_, index) => (
-        <Card key={index} className="h-24" />
+    <Card className="flex h-20 flex-row items-stretch gap-0 py-0">
+      {Array.from({ length: COLUMN_COUNT }).map((_, index) => (
+        <Fragment key={index}>
+          {index > 0 ? (
+            <div
+              aria-hidden
+              className="my-4 w-px shrink-0 bg-border"
+            />
+          ) : null}
+          <div className="flex flex-1 flex-col justify-center px-6" />
+        </Fragment>
       ))}
-    </div>
+    </Card>
   );
 }
