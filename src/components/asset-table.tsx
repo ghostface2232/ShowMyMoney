@@ -275,7 +275,7 @@ function GroupSection({
       <Card className="p-4 shadow-none ring-0">
         <div className="overflow-x-auto">
           <div className="relative flex min-w-fit">
-            <TableRowDividers rowCount={group.categories.length} />
+            <TableRowDividers rowCount={group.categories.length + 1} />
             <NameColumn categories={group.categories} />
             <AnimatePresence mode="popLayout" initial={false}>
               {snapshots.map((snap) => (
@@ -315,6 +315,9 @@ function NameColumn({ categories }: NameColumnProps) {
           <span className="block min-w-0 truncate px-1">{cat.name}</span>
         </div>
       ))}
+      <div className="flex h-11 min-w-0 items-center text-sm font-medium">
+        <span className="block min-w-0 truncate px-1">합계</span>
+      </div>
     </div>
   );
 }
@@ -742,6 +745,14 @@ function SnapshotColumn({
   runAction,
   transition,
 }: SnapshotColumnProps) {
+  const columnTotal = useMemo(() => {
+    let total = 0;
+    for (const cat of categories) {
+      total += Number(snapshot.entriesByCategory[cat.id]?.amount ?? 0);
+    }
+    return total;
+  }, [snapshot.entriesByCategory, categories]);
+
   return (
     <motion.div
       layout
@@ -767,6 +778,10 @@ function SnapshotColumn({
           runAction={runAction}
         />
       ))}
+
+      <div className="flex h-11 w-full items-center justify-end px-3 text-right text-sm font-semibold tabular-nums">
+        {formatKRW(columnTotal)}
+      </div>
     </motion.div>
   );
 }
