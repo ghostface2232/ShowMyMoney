@@ -25,7 +25,7 @@ export default async function HomePage() {
         }))}
       />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8">
-        <SummaryCards />
+        <SummaryCards dashboard={dashboard} />
         <AssetTable dashboard={dashboard} />
       </main>
     </>

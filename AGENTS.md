@@ -44,6 +44,7 @@ Design reference points: Notion database tables, Figma UI3, Claude web. The visu
 - Motion usage favors `layout`, `layoutId`, and `AnimatePresence` for layout-sharing transitions. Default spring transition: `{ type: "spring", stiffness: 380, damping: 34 }`. Consider softening to `stiffness: 280, damping: 32` if animations feel too snappy against Luma's calmer visual rhythm.
 - Respect `useReducedMotion` in the root motion shell: reduce durations to near-zero when the OS requests reduced motion.
 - The asset table orders snapshots newest-left. Charts, in contrast, follow the conventional time-ordered axis (oldest on the left, newest on the right). This asymmetry is intentional: tables optimize for comparison to the latest column, charts optimize for trend legibility.
+- Growth / trend charts are responsive: wrap the Recharts component in `ResponsiveContainer` so it fills the parent container's width, and use `maxBarSize` to keep individual bars from becoming overly wide when snapshots are few.
 
 ## Data Model
 

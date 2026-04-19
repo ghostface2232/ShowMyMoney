@@ -304,7 +304,7 @@ function NameColumn({ categories }: NameColumnProps) {
   return (
     <div
       className="sticky left-0 z-10 flex shrink-0 flex-col bg-card"
-      style={{ width: 48, minWidth: 48, maxWidth: 48, flexBasis: 48 }}
+      style={{ width: 96, minWidth: 96, maxWidth: 96, flexBasis: 96 }}
     >
       <div className="h-10" />
       {categories.map((cat) => (
@@ -751,8 +751,8 @@ function SnapshotColumn({
       exit={{ opacity: 0, width: 0 }}
       className="z-10 flex w-30 shrink-0 flex-col overflow-hidden pl-3"
     >
-      <div className="flex h-10 items-center justify-end text-xs font-medium text-muted-foreground">
-        <span className="truncate px-1">
+      <div className="flex h-10 items-center justify-end px-3 text-sm font-medium text-muted-foreground">
+        <span className="truncate">
           {formatYearMonth(snapshot.year_month)}
         </span>
       </div>
