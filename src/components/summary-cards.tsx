@@ -7,7 +7,7 @@ const COLUMN_COUNT = 4;
 
 export function SummaryCards() {
   return (
-    <Card className="flex h-20 flex-row items-stretch gap-0 py-0">
+    <Card className="flex h-20 flex-row items-stretch gap-0 py-0 shadow-none ring-0">
       {Array.from({ length: COLUMN_COUNT }).map((_, index) => (
         <Fragment key={index}>
           {index > 0 ? (

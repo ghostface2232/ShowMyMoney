@@ -1,15 +1,13 @@
-// 대시보드 최상단 헤더. 좌측 계정 정보, 우측 카테고리 편집/목표 분석/테마 토글 버튼.
-import type { CategoryGroupWithCategories } from "@/actions/categories";
-import { CategoryEditorSheet } from "@/components/category-editor-sheet";
+// 대시보드 최상단 헤더. 좌측 계정 정보, 우측 글로벌 액션(달 추가 / 목표 분석).
+import { AddMonthButton } from "@/components/add-month-button";
 import { GoalAnalysisButton } from "@/components/goal-analysis-button";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 type AppHeaderProps = {
   displayName: string;
-  categoryTree: CategoryGroupWithCategories[];
+  existingYearMonths: number[];
 };
 
-export function AppHeader({ displayName, categoryTree }: AppHeaderProps) {
+export function AppHeader({ displayName, existingYearMonths }: AppHeaderProps) {
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "?";
 
   return (
@@ -25,9 +23,8 @@ export function AppHeader({ displayName, categoryTree }: AppHeaderProps) {
           <span className="text-sm font-medium">{displayName}</span>
         </div>
         <div className="flex items-center gap-2">
-          <CategoryEditorSheet initialTree={categoryTree} />
+          <AddMonthButton existingYearMonths={existingYearMonths} />
           <GoalAnalysisButton />
-          <ThemeToggle />
         </div>
       </div>
     </header>
