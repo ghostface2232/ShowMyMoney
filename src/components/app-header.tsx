@@ -1,13 +1,23 @@
 // 대시보드 최상단 헤더. 좌측 계정 정보, 우측 글로벌 액션(달 관리 / 목표 분석).
+import { GoalDialog } from "@/components/goal-dialog";
 import { MonthManagementButton } from "@/components/month-management-button";
-import { GoalAnalysisButton } from "@/components/goal-analysis-button";
+import type { Goal } from "@/types/db";
 
 type AppHeaderProps = {
   displayName: string;
   snapshots: Array<{ id: string; year_month: number }>;
+  goals: Goal[];
+  currentTotalAssets: number;
+  hasSnapshot: boolean;
 };
 
-export function AppHeader({ displayName, snapshots }: AppHeaderProps) {
+export function AppHeader({
+  displayName,
+  snapshots,
+  goals,
+  currentTotalAssets,
+  hasSnapshot,
+}: AppHeaderProps) {
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "?";
 
   return (
@@ -24,7 +34,11 @@ export function AppHeader({ displayName, snapshots }: AppHeaderProps) {
         </div>
         <div className="flex items-center gap-2">
           <MonthManagementButton snapshots={snapshots} />
-          <GoalAnalysisButton />
+          <GoalDialog
+            goals={goals}
+            currentTotalAssets={currentTotalAssets}
+            hasSnapshot={hasSnapshot}
+          />
         </div>
       </div>
     </header>
