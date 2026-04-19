@@ -245,31 +245,17 @@ function GroupSection({
   transition,
   runAction,
 }: GroupSectionProps) {
-  const latest = snapshots[0];
-  const latestSum = useMemo(() => {
-    if (!latest) return 0;
-    let total = 0;
-    for (const cat of group.categories) {
-      total += latest.entriesByCategory[cat.id]?.amount ?? 0;
-    }
-    return total;
-  }, [latest, group.categories]);
-
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4 px-1">
-        <div className="flex min-w-0 items-center gap-1">
-          <h2 className="truncate px-1 text-2xl font-semibold">{group.name}</h2>
-          <GroupManagementDialog
-            group={group}
-            disabled={pending}
-            runAction={runAction}
-          />
-        </div>
-        <div className="shrink-0 text-sm tabular-nums">
-          <span className="text-muted-foreground">합계 </span>
-          <span className="font-semibold">{formatKRW(latestSum)}</span>
-        </div>
+        <h2 className="min-w-0 truncate px-1 text-2xl font-semibold">
+          {group.name}
+        </h2>
+        <GroupManagementDialog
+          group={group}
+          disabled={pending}
+          runAction={runAction}
+        />
       </div>
 
       <Card className="p-4 shadow-none ring-0">
@@ -410,7 +396,7 @@ function GroupManagementDialog({
             variant="ghost"
             size="icon-xs"
             disabled={disabled}
-            className="text-muted-foreground"
+            className="shrink-0 rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted-foreground/15 hover:text-foreground"
             aria-label={`${group.name} 관리`}
           >
             <MoreHorizontal className="size-3.5" />
