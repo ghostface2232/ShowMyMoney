@@ -1,12 +1,15 @@
-// 대시보드 최상단 헤더. 좌측 계정 정보, 우측 테마 토글과 목표 분석 버튼.
+// 대시보드 최상단 헤더. 좌측 계정 정보, 우측 카테고리 편집/목표 분석/테마 토글 버튼.
+import type { CategoryGroupWithCategories } from "@/actions/categories";
+import { CategoryEditorSheet } from "@/components/category-editor-sheet";
 import { GoalAnalysisButton } from "@/components/goal-analysis-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 type AppHeaderProps = {
   displayName: string;
+  categoryTree: CategoryGroupWithCategories[];
 };
 
-export function AppHeader({ displayName }: AppHeaderProps) {
+export function AppHeader({ displayName, categoryTree }: AppHeaderProps) {
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "?";
 
   return (
@@ -22,8 +25,9 @@ export function AppHeader({ displayName }: AppHeaderProps) {
           <span className="text-sm font-medium">{displayName}</span>
         </div>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
+          <CategoryEditorSheet initialTree={categoryTree} />
           <GoalAnalysisButton />
+          <ThemeToggle />
         </div>
       </div>
     </header>

@@ -1,6 +1,7 @@
-// 홈 대시보드 진입점. 세션이 없으면 /login, 있으면 헤더/요약/테이블을 SSR로 렌더한다.
+// 홈 대시보드 진입점. 세션 검증 후 카테고리 트리를 SSR로 받아 헤더/요약/테이블에 주입한다.
 import { redirect } from "next/navigation";
 
+import { listCategoryTree } from "@/actions/categories";
 import { AppHeader } from "@/components/app-header";
 import { AssetTable } from "@/components/asset-table";
 import { SummaryCards } from "@/components/summary-cards";
@@ -12,9 +13,14 @@ export default async function HomePage() {
     redirect("/login");
   }
 
+  const categoryTree = await listCategoryTree();
+
   return (
     <>
-      <AppHeader displayName={session.displayName} />
+      <AppHeader
+        displayName={session.displayName}
+        categoryTree={categoryTree}
+      />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8">
         <SummaryCards />
         <AssetTable />

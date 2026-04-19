@@ -43,6 +43,7 @@ Design reference points: Notion database tables, Figma UI3, Claude web. The visu
 - Work with Luma's design tokens instead of overriding them. Borders lean toward rounded (`rounded-xl` and above for cards), shadows stay soft, spacing stays generous. Avoid sharp corners, heavy borders, or dense padding that would fight the preset.
 - Motion usage favors `layout`, `layoutId`, and `AnimatePresence` for layout-sharing transitions. Default spring transition: `{ type: "spring", stiffness: 380, damping: 34 }`. Consider softening to `stiffness: 280, damping: 32` if animations feel too snappy against Luma's calmer visual rhythm.
 - Respect `useReducedMotion` in the root motion shell: reduce durations to near-zero when the OS requests reduced motion.
+- The asset table orders snapshots newest-left. Charts, in contrast, follow the conventional time-ordered axis (oldest on the left, newest on the right). This asymmetry is intentional: tables optimize for comparison to the latest column, charts optimize for trend legibility.
 
 ## Data Model
 
