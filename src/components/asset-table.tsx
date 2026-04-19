@@ -396,14 +396,14 @@ function GroupManagementDialog({
             variant="ghost"
             size="icon-xs"
             disabled={disabled}
-            className="shrink-0 rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted-foreground/15 hover:text-foreground"
+            className="shrink-0 rounded-full bg-foreground/7 text-muted-foreground transition-colors hover:bg-foreground/12 hover:text-foreground dark:bg-foreground/14 dark:hover:bg-foreground/20"
             aria-label={`${group.name} 관리`}
           >
             <MoreHorizontal className="size-3.5" />
           </Button>
         </DialogTrigger>
         <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-lg">
-          <DialogHeader>
+          <DialogHeader className="items-start pr-10">
             <EditableDialogTitle
               value={group.name}
               disabled={disabled}
@@ -480,7 +480,7 @@ function GroupManagementDialog({
                   placeholder="새 항목 이름"
                   disabled={disabled}
                   maxLength={40}
-                  className="h-8"
+                  className="h-8 px-3"
                 />
                 <Button
                   type="button"
@@ -577,7 +577,7 @@ function GroupCategoryRow({
       animate={{ opacity: 1, height: "auto", y: 0 }}
       exit={{ opacity: 0, height: 0, y: -6 }}
       transition={transition}
-      className="flex items-center gap-1 overflow-hidden px-2 py-2"
+      className="flex items-center gap-1 overflow-hidden py-2"
     >
       <Input
         key={category.name}
@@ -601,7 +601,7 @@ function GroupCategoryRow({
         }}
         disabled={disabled}
         maxLength={40}
-        className="h-8 border-transparent bg-transparent px-1 shadow-none focus-visible:bg-input/50 focus-visible:ring-0"
+        className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:bg-transparent focus-visible:ring-0"
       />
       <Button
         type="button"
@@ -671,7 +671,10 @@ function EditableDialogTitle({
 
   if (editing) {
     return (
-      <DialogTitle asChild>
+      <DialogTitle
+        asChild
+        className="w-full min-w-0 text-3xl font-semibold leading-tight sm:w-2/3"
+      >
         <input
           autoFocus
           value={draft}
@@ -688,19 +691,22 @@ function EditableDialogTitle({
           }}
           disabled={disabled}
           maxLength={40}
-          className="w-2/3 min-w-0 rounded bg-transparent px-1 text-3xl font-semibold outline-none"
+          className="rounded bg-transparent px-0 outline-none"
         />
       </DialogTitle>
     );
   }
 
   return (
-    <DialogTitle asChild>
+    <DialogTitle
+      asChild
+      className="w-full min-w-0 text-3xl font-semibold leading-tight sm:max-w-[66%]"
+    >
       <button
         type="button"
         onClick={start}
         disabled={disabled}
-        className="max-w-[66%] min-w-0 truncate rounded px-1 text-left text-3xl font-semibold transition-colors hover:bg-muted/40 disabled:opacity-50"
+        className="truncate rounded px-0 text-left transition-colors hover:text-foreground/80 disabled:opacity-50"
       >
         {value}
       </button>
