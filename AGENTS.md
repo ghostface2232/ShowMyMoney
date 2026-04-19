@@ -74,6 +74,7 @@ RLS is enabled on every table with no policies. This blocks any access via the p
 - Never accept `accountId` as a client-supplied parameter. Always pull it from the session.
 - Never log the plaintext PIN. When logging auth failures, log only a generic failure event.
 - On sign-in, introduce a minimum 200ms delay on failure to blunt timing attacks during PIN scanning.
+- Sign-up rejects duplicate PINs by iterating every account's bcrypt hash and running `verifyPin` on each. Acceptable at the current ~10-user scale but not scalable — a future upgrade could prefix each PIN with a short salt identifier so sign-in / duplicate checks only compare against the matching prefix bucket.
 - When a server action mutates resources owned by the account (categories, snapshots, entries, goals), verify ownership by joining back to `account_id` before applying the change.
 
 ## Known Limits and Future Directions
