@@ -27,8 +27,13 @@ export function CountUp({
 
   useEffect(() => {
     if (reducedMotion) {
-      // 모션 끄기 상태에서는 rAF를 돌리지 않는다. 렌더 시 prop을 그대로 쓴다.
+      // 모션 끄기 상태에서는 rAF를 돌리지 않고 즉시 동기화한다.
+      // animatedValue까지 맞춰 두지 않으면 사용자가 reducedMotion을 해제한 직후
+      // 다음 값 변경 전까지 stale한 수치가 그대로 보인다. 같은 값을 setState하면
+      // React가 bail-out해서 cascading render는 일어나지 않는다.
       currentRef.current = value;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAnimatedValue(value);
       return;
     }
 
@@ -65,6 +70,7 @@ export function CountUp({
     };
   }, [value, durationMs, reducedMotion]);
 
-  const display = reducedMotion ? value : animatedValue;
-  return <span className={className}>{format(Math.round(display))}</span>;
+  return (
+    <span className={className}>{format(Math.round(animatedValue))}</span>
+  );
 }
