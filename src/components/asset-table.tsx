@@ -2,7 +2,9 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
   type KeyboardEvent,
@@ -69,9 +71,21 @@ type Props = {
   dashboard: DashboardData;
 };
 
-type ActionResult = { ok: true } | { ok: false; error: string };
+type ActionResult<T extends object = object> =
+  | ({ ok: true } & T)
+  | { ok: false; error: string };
 
-type RunAction = (action: () => Promise<ActionResult>) => Promise<void>;
+type TableActions = {
+  createGroup: (name: string) => void;
+  renameGroup: (groupId: string, name: string) => void;
+  deleteGroup: (groupId: string) => void;
+  createCategory: (groupId: string, name: string) => void;
+  renameCategory: (categoryId: string, name: string) => void;
+  deleteCategory: (categoryId: string) => void;
+  reorderCategories: (groupId: string, orderedIds: string[]) => void;
+  upsertEntry: (snapshotId: string, categoryId: string, amount: number) => void;
+  deleteEntry: (entryId: string) => void;
+};
 
 const INPUT_NO_FOCUS_RING =
   "focus-visible:border-transparent focus-visible:ring-0";
@@ -82,52 +96,350 @@ type GroupDeleteTarget =
 
 export function AssetTable({ dashboard }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [localDashboard, setLocalDashboardState] = useState(dashboard);
   const [addingGroup, setAddingGroup] = useState(false);
+  const localDashboardRef = useRef(dashboard);
+  const serverDashboardRef = useRef(dashboard);
+  const pendingBackgroundCountRef = useRef(0);
+  const canceledEntryIdsRef = useRef(new Set<string>());
 
   const reducedMotion = useReducedMotion();
   const transition: Transition = reducedMotion ? { duration: 0 } : SPRING_SOFT;
 
+  useEffect(() => {
+    serverDashboardRef.current = dashboard;
+    if (pendingBackgroundCountRef.current > 0) return;
+    localDashboardRef.current = dashboard;
+    setLocalDashboardState(dashboard);
+  }, [dashboard]);
+
   const existingYearMonths = useMemo(
-    () => new Set(dashboard.snapshots.map((s) => s.year_month)),
-    [dashboard.snapshots],
+    () => new Set(localDashboard.snapshots.map((s) => s.year_month)),
+    [localDashboard.snapshots],
   );
 
-  function refetch() {
+  function setLocalDashboard(update: (current: DashboardData) => DashboardData) {
+    setLocalDashboardState((current) => {
+      const next = update(current);
+      localDashboardRef.current = next;
+      return next;
+    });
+  }
+
+  function restoreServerDashboard() {
+    const latestServer = serverDashboardRef.current;
+    localDashboardRef.current = latestServer;
+    setLocalDashboardState(latestServer);
+  }
+
+  function refresh() {
     startTransition(() => {
       router.refresh();
     });
   }
 
-  const runAction: RunAction = async (action) => {
-    const result = await action();
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    refetch();
-  };
-
-  async function addSnapshot(yearMonth: number) {
-    await runAction(() => createSnapshot(yearMonth));
+  function runInBackground<T extends object = object>(
+    action: Promise<ActionResult<T>>,
+    onSuccess?: (result: { ok: true } & T) => void,
+  ) {
+    pendingBackgroundCountRef.current += 1;
+    void action
+      .then((result) => {
+        if (!result.ok) {
+          toast.error(result.error);
+          restoreServerDashboard();
+          refresh();
+          return;
+        }
+        onSuccess?.(result);
+        refresh();
+      })
+      .catch(() => {
+        toast.error("변경사항을 저장하지 못했습니다.");
+        restoreServerDashboard();
+        refresh();
+      })
+      .finally(() => {
+        pendingBackgroundCountRef.current = Math.max(
+          0,
+          pendingBackgroundCountRef.current - 1,
+        );
+      });
   }
 
-  const hasSnapshots = dashboard.snapshots.length > 0;
-  const hasGroups = dashboard.categoryTree.length > 0;
+  function addSnapshot(yearMonth: number) {
+    const tempId = createTempId("snapshot");
+    const tempSnapshot: SnapshotWithEntries = {
+      id: tempId,
+      account_id: "",
+      year_month: yearMonth,
+      note: null,
+      created_at: new Date().toISOString(),
+      entriesByCategory: {},
+    };
+
+    setLocalDashboard((current) => ({
+      ...current,
+      snapshots: [tempSnapshot, ...current.snapshots].sort(
+        (a, b) => b.year_month - a.year_month,
+      ),
+    }));
+    runInBackground(createSnapshot(yearMonth), (result) => {
+      setLocalDashboard((current) => ({
+        ...current,
+        snapshots: current.snapshots.map((snapshot) =>
+          snapshot.id === tempId
+            ? { ...result.snapshot, entriesByCategory: snapshot.entriesByCategory }
+            : snapshot,
+        ),
+      }));
+    });
+  }
+
+  const actions: TableActions = {
+    createGroup(name) {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const tempId = createTempId("group");
+      const tempGroup: CategoryGroupWithCategories = {
+        id: tempId,
+        account_id: "",
+        name: trimmed,
+        sort_order: localDashboardRef.current.categoryTree.length,
+        created_at: new Date().toISOString(),
+        categories: [],
+      };
+
+      setLocalDashboard((current) => ({
+        ...current,
+        categoryTree: [...current.categoryTree, tempGroup],
+      }));
+      runInBackground(createGroup(trimmed), (result) => {
+        setLocalDashboard((current) => ({
+          ...current,
+          categoryTree: current.categoryTree.map((group) =>
+            group.id === tempId
+              ? { ...result.group, categories: group.categories }
+              : group,
+          ),
+        }));
+      });
+    },
+    renameGroup(groupId, name) {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      setLocalDashboard((current) => ({
+        ...current,
+        categoryTree: current.categoryTree.map((group) =>
+          group.id === groupId ? { ...group, name: trimmed } : group,
+        ),
+      }));
+      runInBackground(renameGroup(groupId, trimmed));
+    },
+    deleteGroup(groupId) {
+      const group = localDashboardRef.current.categoryTree.find(
+        (item) => item.id === groupId,
+      );
+      const categoryIds = new Set(group?.categories.map((item) => item.id));
+
+      setLocalDashboard((current) => ({
+        categoryTree: current.categoryTree.filter((item) => item.id !== groupId),
+        snapshots: current.snapshots.map((snapshot) => ({
+          ...snapshot,
+          entriesByCategory: omitEntries(snapshot.entriesByCategory, categoryIds),
+        })),
+      }));
+      runInBackground(deleteGroup(groupId));
+    },
+    createCategory(groupId, name) {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const group = localDashboardRef.current.categoryTree.find(
+        (item) => item.id === groupId,
+      );
+      if (!group) return;
+      const tempId = createTempId("category");
+      const tempCategory: Category = {
+        id: tempId,
+        group_id: groupId,
+        name: trimmed,
+        sort_order: group.categories.length,
+        created_at: new Date().toISOString(),
+      };
+
+      setLocalDashboard((current) => ({
+        ...current,
+        categoryTree: current.categoryTree.map((item) =>
+          item.id === groupId
+            ? { ...item, categories: [...item.categories, tempCategory] }
+            : item,
+        ),
+      }));
+      runInBackground(createCategory(groupId, trimmed), (result) => {
+        setLocalDashboard((current) => ({
+          ...current,
+          categoryTree: current.categoryTree.map((item) =>
+            item.id === groupId
+              ? {
+                  ...item,
+                  categories: item.categories.map((category) =>
+                    category.id === tempId ? result.category : category,
+                  ),
+                }
+              : item,
+          ),
+        }));
+      });
+    },
+    renameCategory(categoryId, name) {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      setLocalDashboard((current) => ({
+        ...current,
+        categoryTree: current.categoryTree.map((group) => ({
+          ...group,
+          categories: group.categories.map((category) =>
+            category.id === categoryId
+              ? { ...category, name: trimmed }
+              : category,
+          ),
+        })),
+      }));
+      runInBackground(renameCategory(categoryId, trimmed));
+    },
+    deleteCategory(categoryId) {
+      setLocalDashboard((current) => ({
+        categoryTree: current.categoryTree.map((group) => ({
+          ...group,
+          categories: group.categories.filter(
+            (category) => category.id !== categoryId,
+          ),
+        })),
+        snapshots: current.snapshots.map((snapshot) => ({
+          ...snapshot,
+          entriesByCategory: omitEntries(
+            snapshot.entriesByCategory,
+            new Set([categoryId]),
+          ),
+        })),
+      }));
+      runInBackground(deleteCategory(categoryId));
+    },
+    reorderCategories(groupId, orderedIds) {
+      setLocalDashboard((current) => ({
+        ...current,
+        categoryTree: current.categoryTree.map((group) => {
+          if (group.id !== groupId) return group;
+          const byId = new Map(
+            group.categories.map((category) => [category.id, category]),
+          );
+          return {
+            ...group,
+            categories: orderedIds
+              .map((id, index) => {
+                const category = byId.get(id);
+                return category ? { ...category, sort_order: index } : null;
+              })
+              .filter((category): category is Category => category !== null),
+          };
+        }),
+      }));
+      runInBackground(reorderCategories(groupId, orderedIds));
+    },
+    upsertEntry(snapshotId, categoryId, amount) {
+      const existing =
+        localDashboardRef.current.snapshots.find(
+          (snapshot) => snapshot.id === snapshotId,
+        )?.entriesByCategory[categoryId] ?? null;
+      const optimisticId = existing?.id ?? createTempId("entry");
+      const now = new Date().toISOString();
+
+      setLocalDashboard((current) => ({
+        ...current,
+        snapshots: current.snapshots.map((snapshot) =>
+          snapshot.id === snapshotId
+            ? {
+                ...snapshot,
+                entriesByCategory: {
+                  ...snapshot.entriesByCategory,
+                  [categoryId]: {
+                    id: optimisticId,
+                    snapshot_id: snapshotId,
+                    category_id: categoryId,
+                    amount,
+                    created_at: existing?.created_at ?? now,
+                    updated_at: now,
+                  },
+                },
+              }
+            : snapshot,
+        ),
+      }));
+      runInBackground(upsertEntry(snapshotId, categoryId, amount), (result) => {
+        if (canceledEntryIdsRef.current.has(optimisticId)) {
+          canceledEntryIdsRef.current.delete(optimisticId);
+          void deleteEntry(result.entry.id).then(() => refresh());
+          return;
+        }
+        setLocalDashboard((current) => ({
+          ...current,
+          snapshots: current.snapshots.map((snapshot) =>
+            snapshot.id === snapshotId
+              ? {
+                  ...snapshot,
+                  entriesByCategory: {
+                    ...snapshot.entriesByCategory,
+                    [categoryId]: result.entry,
+                  },
+                }
+              : snapshot,
+          ),
+        }));
+      });
+    },
+    deleteEntry(entryId) {
+      const location = findEntryLocation(localDashboardRef.current, entryId);
+      if (!location) return;
+
+      setLocalDashboard((current) => ({
+        ...current,
+        snapshots: current.snapshots.map((snapshot) =>
+          snapshot.id === location.snapshotId
+            ? {
+                ...snapshot,
+                entriesByCategory: omitEntries(
+                  snapshot.entriesByCategory,
+                  new Set([location.categoryId]),
+                ),
+              }
+            : snapshot,
+        ),
+      }));
+
+      if (isOptimisticId(entryId)) {
+        canceledEntryIdsRef.current.add(entryId);
+        return;
+      }
+      runInBackground(deleteEntry(entryId));
+    },
+  };
+
+  const hasSnapshots = localDashboard.snapshots.length > 0;
+  const hasGroups = localDashboard.categoryTree.length > 0;
 
   return (
     <div className="flex flex-col gap-8 pb-8">
       {hasSnapshots ? (
         <>
           {hasGroups ? (
-            dashboard.categoryTree.map((group) => (
+            localDashboard.categoryTree.map((group) => (
               <GroupSection
                 key={group.id}
                 group={group}
-                snapshots={dashboard.snapshots}
-                pending={pending}
+                snapshots={localDashboard.snapshots}
                 transition={transition}
-                runAction={runAction}
+                actions={actions}
               />
             ))
           ) : (
@@ -136,15 +448,14 @@ export function AssetTable({ dashboard }: Props) {
           <AddGroupRow
             addingGroup={addingGroup}
             setAddingGroup={setAddingGroup}
-            runAction={runAction}
-            pending={pending}
+            actions={actions}
           />
         </>
       ) : (
         <EmptyState
           existing={existingYearMonths}
           onSelect={addSnapshot}
-          disabled={pending}
+          disabled={false}
         />
       )}
     </div>
@@ -194,24 +505,22 @@ function EmptyGroupsHint() {
 function AddGroupRow({
   addingGroup,
   setAddingGroup,
-  runAction,
-  pending,
+  actions,
 }: {
   addingGroup: boolean;
   setAddingGroup: (next: boolean) => void;
-  runAction: RunAction;
-  pending: boolean;
+  actions: TableActions;
 }) {
   if (addingGroup) {
     return (
       <div className="px-1">
         <InlineNameInput
           placeholder="새 그룹 이름"
-          disabled={pending}
+          disabled={false}
           onCancel={() => setAddingGroup(false)}
           onSave={(name) => {
             setAddingGroup(false);
-            runAction(() => createGroup(name));
+            actions.createGroup(name);
           }}
         />
       </div>
@@ -222,7 +531,6 @@ function AddGroupRow({
       <button
         type="button"
         onClick={() => setAddingGroup(true)}
-        disabled={pending}
         className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-white/70 disabled:pointer-events-none disabled:opacity-50"
       >
         <Plus className="size-3.5" />
@@ -235,17 +543,15 @@ function AddGroupRow({
 type GroupSectionProps = {
   group: CategoryGroupWithCategories;
   snapshots: SnapshotWithEntries[];
-  pending: boolean;
   transition: Transition;
-  runAction: RunAction;
+  actions: TableActions;
 };
 
 function GroupSection({
   group,
   snapshots,
-  pending,
   transition,
-  runAction,
+  actions,
 }: GroupSectionProps) {
   return (
     <section className="space-y-3">
@@ -255,8 +561,8 @@ function GroupSection({
         </h2>
         <GroupManagementDialog
           group={group}
-          disabled={pending}
-          runAction={runAction}
+          disabled={false}
+          actions={actions}
         />
       </div>
 
@@ -271,8 +577,8 @@ function GroupSection({
                   key={snap.id}
                   snapshot={snap}
                   categories={group.categories}
-                  disabled={pending}
-                  runAction={runAction}
+                  disabled={false}
+                  actions={actions}
                   transition={transition}
                 />
               ))}
@@ -329,11 +635,11 @@ function TableRowDividers({ rowCount }: { rowCount: number }) {
 function GroupManagementDialog({
   group,
   disabled,
-  runAction,
+  actions,
 }: {
   group: CategoryGroupWithCategories;
   disabled: boolean;
-  runAction: RunAction;
+  actions: TableActions;
 }) {
   const [open, setOpen] = useState(false);
   const [newCategory, setNewCategory] = useState("");
@@ -349,27 +655,25 @@ function GroupManagementDialog({
       return;
     }
     if (trimmed === group.name) return;
-    await runAction(() => renameGroup(group.id, trimmed));
+    actions.renameGroup(group.id, trimmed);
   }
 
-  async function addCategory() {
+  function addCategory() {
     const trimmed = newCategory.trim();
     if (!trimmed) return;
     setNewCategory("");
-    await runAction(() => createCategory(group.id, trimmed));
+    actions.createCategory(group.id, trimmed);
   }
 
-  async function moveCategory(categoryId: string, direction: -1 | 1) {
+  function moveCategory(categoryId: string, direction: -1 | 1) {
     const index = group.categories.findIndex((cat) => cat.id === categoryId);
     const next = index + direction;
     if (index === -1 || next < 0 || next >= group.categories.length) return;
     const reordered = [...group.categories];
     [reordered[index], reordered[next]] = [reordered[next], reordered[index]];
-    await runAction(() =>
-      reorderCategories(
-        group.id,
-        reordered.map((cat) => cat.id),
-      ),
+    actions.reorderCategories(
+      group.id,
+      reordered.map((cat) => cat.id),
     );
   }
 
@@ -380,11 +684,11 @@ function GroupManagementDialog({
 
     if (target.kind === "group") {
       setOpen(false);
-      await runAction(() => deleteGroup(target.id));
+      actions.deleteGroup(target.id);
       return;
     }
 
-    await runAction(() => deleteCategory(target.id));
+    actions.deleteCategory(target.id);
   }
 
   return (
@@ -442,7 +746,7 @@ function GroupManagementDialog({
                         canMoveDown={index < group.categories.length - 1}
                         transition={transition}
                         onRename={(name) =>
-                          runAction(() => renameCategory(category.id, name))
+                          actions.renameCategory(category.id, name)
                         }
                         onMove={(direction) =>
                           moveCategory(category.id, direction)
@@ -729,7 +1033,7 @@ type SnapshotColumnProps = {
   snapshot: SnapshotWithEntries;
   categories: Category[];
   disabled: boolean;
-  runAction: RunAction;
+  actions: TableActions;
   transition: Transition;
 };
 
@@ -737,7 +1041,7 @@ function SnapshotColumn({
   snapshot,
   categories,
   disabled,
-  runAction,
+  actions,
   transition,
 }: SnapshotColumnProps) {
   const columnTotal = useMemo(() => {
@@ -782,7 +1086,7 @@ function SnapshotColumn({
           categoryId={cat.id}
           entry={snapshot.entriesByCategory[cat.id]}
           disabled={disabled}
-          runAction={runAction}
+          actions={actions}
         />
       ))}
 
@@ -798,7 +1102,7 @@ type AmountCellProps = {
   categoryId: string;
   entry: SnapshotWithEntries["entriesByCategory"][string] | undefined;
   disabled: boolean;
-  runAction: RunAction;
+  actions: TableActions;
 };
 
 function AmountCell({
@@ -806,7 +1110,7 @@ function AmountCell({
   categoryId,
   entry,
   disabled,
-  runAction,
+  actions,
 }: AmountCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -817,12 +1121,12 @@ function AmountCell({
     setEditing(true);
   }
 
-  async function commit() {
+  function commit() {
     setEditing(false);
     const raw = draft.replace(/\D/g, "");
     const next = raw.length === 0 ? 0 : Number(raw);
     if (next === amount) return;
-    await runAction(() => upsertEntry(snapshotId, categoryId, next));
+    actions.upsertEntry(snapshotId, categoryId, next);
   }
 
   function cancel() {
@@ -830,13 +1134,13 @@ function AmountCell({
     setDraft("");
   }
 
-  async function remove() {
+  function remove() {
     if (!entry) {
       setEditing(false);
       return;
     }
     setEditing(false);
-    await runAction(() => deleteEntry(entry.id));
+    actions.deleteEntry(entry.id);
   }
 
   if (editing) {
@@ -940,4 +1244,41 @@ function InlineNameInput({
       className="cursor-text rounded bg-transparent px-1 text-left text-sm outline-none ring-1 ring-ring/60 ring-inset transition-colors placeholder:text-muted-foreground/60 hover:bg-input/70"
     />
   );
+}
+
+function createTempId(kind: string): string {
+  return `optimistic-${kind}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+}
+
+function isOptimisticId(id: string): boolean {
+  return id.startsWith("optimistic-");
+}
+
+function omitEntries(
+  entries: SnapshotWithEntries["entriesByCategory"],
+  categoryIds: Set<string>,
+): SnapshotWithEntries["entriesByCategory"] {
+  const next = { ...entries };
+  for (const categoryId of categoryIds) {
+    delete next[categoryId];
+  }
+  return next;
+}
+
+function findEntryLocation(
+  dashboard: DashboardData,
+  entryId: string,
+): { snapshotId: string; categoryId: string } | null {
+  for (const snapshot of dashboard.snapshots) {
+    for (const [categoryId, entry] of Object.entries(
+      snapshot.entriesByCategory,
+    )) {
+      if (entry.id === entryId) {
+        return { snapshotId: snapshot.id, categoryId };
+      }
+    }
+  }
+  return null;
 }

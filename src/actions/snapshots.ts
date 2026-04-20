@@ -7,7 +7,9 @@ import { requireAccount } from "@/lib/auth-guard";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Snapshot } from "@/types/db";
 
-type Result = { ok: true } | { ok: false; error: string };
+type Result<T extends object = object> =
+  | ({ ok: true } & T)
+  | { ok: false; error: string };
 
 export async function listSnapshots(): Promise<Snapshot[]> {
   const accountId = await requireAccount();
@@ -28,7 +30,7 @@ export async function listSnapshots(): Promise<Snapshot[]> {
 export async function createSnapshot(
   yearMonth: number,
   note?: string,
-): Promise<Result> {
+): Promise<Result<{ snapshot: Snapshot }>> {
   const accountId = await requireAccount();
   if (!isValidYearMonth(yearMonth)) {
     return { ok: false, error: "년월 형식이 올바르지 않습니다." };
@@ -36,11 +38,15 @@ export async function createSnapshot(
 
   const supabase = getSupabaseAdmin();
   const trimmedNote = note?.trim();
-  const { error } = await supabase.from("snapshots").insert({
-    account_id: accountId,
-    year_month: yearMonth,
-    note: trimmedNote ? trimmedNote : null,
-  });
+  const { data, error } = await supabase
+    .from("snapshots")
+    .insert({
+      account_id: accountId,
+      year_month: yearMonth,
+      note: trimmedNote ? trimmedNote : null,
+    })
+    .select("id, account_id, year_month, note, created_at")
+    .single();
 
   if (error) {
     if (error.code === "23505") {
@@ -50,7 +56,7 @@ export async function createSnapshot(
   }
 
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, snapshot: data as Snapshot };
 }
 
 export async function deleteSnapshot(snapshotId: string): Promise<Result> {

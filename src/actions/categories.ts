@@ -11,7 +11,9 @@ export type CategoryGroupWithCategories = CategoryGroup & {
   categories: Category[];
 };
 
-type Result = { ok: true } | { ok: false; error: string };
+type Result<T extends object = object> =
+  | ({ ok: true } & T)
+  | { ok: false; error: string };
 
 export async function listCategoryTree(): Promise<CategoryGroupWithCategories[]> {
   const accountId = await requireAccount();
@@ -56,7 +58,9 @@ export async function listCategoryTree(): Promise<CategoryGroupWithCategories[]>
   }));
 }
 
-export async function createGroup(name: string): Promise<Result> {
+export async function createGroup(
+  name: string,
+): Promise<Result<{ group: CategoryGroup }>> {
   const accountId = await requireAccount();
   const trimmed = name.trim();
   if (trimmed.length === 0) return { ok: false, error: "이름을 입력하세요." };
@@ -71,13 +75,15 @@ export async function createGroup(name: string): Promise<Result> {
   if (tailError) return { ok: false, error: "순서를 계산하지 못했습니다." };
 
   const nextOrder = (tail?.[0]?.sort_order ?? -1) + 1;
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("category_groups")
-    .insert({ account_id: accountId, name: trimmed, sort_order: nextOrder });
+    .insert({ account_id: accountId, name: trimmed, sort_order: nextOrder })
+    .select("id, account_id, name, sort_order, created_at")
+    .single();
   if (error) return { ok: false, error: "그룹 생성에 실패했습니다." };
 
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, group: data as CategoryGroup };
 }
 
 export async function renameGroup(groupId: string, name: string): Promise<Result> {
@@ -116,7 +122,10 @@ export async function deleteGroup(groupId: string): Promise<Result> {
   return { ok: true };
 }
 
-export async function createCategory(groupId: string, name: string): Promise<Result> {
+export async function createCategory(
+  groupId: string,
+  name: string,
+): Promise<Result<{ category: Category }>> {
   const accountId = await requireAccount();
   const trimmed = name.trim();
   if (trimmed.length === 0) return { ok: false, error: "이름을 입력하세요." };
@@ -135,13 +144,15 @@ export async function createCategory(groupId: string, name: string): Promise<Res
   if (tailError) return { ok: false, error: "순서를 계산하지 못했습니다." };
 
   const nextOrder = (tail?.[0]?.sort_order ?? -1) + 1;
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("categories")
-    .insert({ group_id: groupId, name: trimmed, sort_order: nextOrder });
+    .insert({ group_id: groupId, name: trimmed, sort_order: nextOrder })
+    .select("id, group_id, name, sort_order, created_at")
+    .single();
   if (error) return { ok: false, error: "항목 생성에 실패했습니다." };
 
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, category: data as Category };
 }
 
 export async function renameCategory(

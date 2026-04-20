@@ -7,7 +7,9 @@ import { requireAccount } from "@/lib/auth-guard";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Entry } from "@/types/db";
 
-type Result = { ok: true } | { ok: false; error: string };
+type Result<T extends object = object> =
+  | ({ ok: true } & T)
+  | { ok: false; error: string };
 
 export async function listEntriesBySnapshot(
   snapshotId: string,
@@ -39,7 +41,7 @@ export async function upsertEntry(
   snapshotId: string,
   categoryId: string,
   amount: number,
-): Promise<Result> {
+): Promise<Result<{ entry: Entry }>> {
   const accountId = await requireAccount();
 
   if (!Number.isFinite(amount) || amount < 0) {
@@ -54,16 +56,18 @@ export async function upsertEntry(
     return { ok: false, error: "항목을 찾을 수 없습니다." };
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("entries")
     .upsert(
       { snapshot_id: snapshotId, category_id: categoryId, amount },
       { onConflict: "snapshot_id,category_id" },
-    );
+    )
+    .select("id, snapshot_id, category_id, amount, created_at, updated_at")
+    .single();
   if (error) return { ok: false, error: "금액 저장에 실패했습니다." };
 
   revalidatePath("/");
-  return { ok: true };
+  return { ok: true, entry: data as Entry };
 }
 
 export async function deleteEntry(entryId: string): Promise<Result> {
