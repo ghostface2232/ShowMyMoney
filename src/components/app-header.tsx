@@ -22,10 +22,10 @@ export function AppHeader({
   hasSnapshot,
 }: AppHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 border-b bg-background/70 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-8">
+    <header className="sticky top-0 z-30 bg-background/70 backdrop-blur">
+      <div className="mx-auto flex min-h-22 max-w-7xl items-center justify-between gap-4 px-4 pt-5 pb-3 md:min-h-24 md:px-8 md:pt-7 md:pb-4">
         <ProfileMenu displayName={displayName} firstUsedAt={firstUsedAt} />
-        <div className="flex items-center gap-2">
+        <div className="grid shrink-0 grid-cols-1 gap-2">
           <MonthManagementButton snapshots={snapshots} />
           <GoalDialog
             goals={goals}

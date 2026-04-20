@@ -71,7 +71,7 @@ export default function LoginPage() {
           </Button>
           <Link
             href="/signup"
-            className="text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="rounded-full px-3 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
           >
             새 계정 만들기
           </Link>

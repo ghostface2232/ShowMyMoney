@@ -82,9 +82,14 @@ export function MonthManagementButton({ snapshots }: Props) {
         onSelect={handleSelect}
         disabled={pending}
         trigger={
-          <Button variant="outline" size="sm" disabled={pending}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pending}
+            className="min-w-26 justify-start gap-2.5 border-transparent bg-white text-foreground hover:bg-white/70 aria-expanded:bg-white/70"
+          >
             <CalendarDays className="size-4" />
-            달 관리
+            월별 관리
           </Button>
         }
       />

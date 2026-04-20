@@ -77,16 +77,16 @@ export function SummaryCards({ dashboard }: Props) {
               className={cn(
                 "relative flex min-w-0 cursor-pointer flex-col justify-center gap-1 bg-card px-4 py-4 text-left transition-colors",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                "hover:bg-muted/40",
+                "hover:bg-muted/70",
                 "sm:px-6",
                 card.fullWidthOnMobile && "col-span-2 sm:col-auto",
                 // right divider (::after) — inset top/bottom 16px
-                "after:pointer-events-none after:absolute after:top-4 after:bottom-4 after:right-0 after:w-px after:bg-border after:content-['']",
+                "after:pointer-events-none after:absolute after:top-4 after:bottom-4 after:right-0 after:w-[1.2px] after:bg-border after:content-['']",
                 !flags.mobileRight && "after:hidden",
                 !flags.mobileRight && flags.desktopRight && "sm:after:block",
                 flags.mobileRight && !flags.desktopRight && "sm:after:hidden",
                 // bottom divider (::before) — inset left/right 16px
-                "before:pointer-events-none before:absolute before:bottom-0 before:left-4 before:right-4 before:h-px before:bg-border before:content-['']",
+                "before:pointer-events-none before:absolute before:bottom-0 before:left-4 before:right-4 before:h-[1.2px] before:bg-border before:content-['']",
                 !flags.mobileBottom && "before:hidden",
                 flags.mobileBottom && "sm:before:hidden",
               )}

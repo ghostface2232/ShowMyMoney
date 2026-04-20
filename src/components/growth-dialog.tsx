@@ -1,8 +1,6 @@
 // 요약 카드 탭 시 열리는 그룹별 월별 증식량 Dialog. 데스크톱은 중앙 Dialog, 모바일은 하단 Sheet로 전환한다.
 "use client";
 
-import { useId } from "react";
-
 import {
   Dialog,
   DialogContent,
@@ -41,18 +39,16 @@ export function GrowthDialog({
   series,
 }: Props) {
   const isMobile = useMediaQuery("(max-width: 639px)");
-  const titleId = useId();
 
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          aria-labelledby={titleId}
           className="max-h-[90dvh] rounded-t-4xl"
         >
           <SheetHeader>
-            <SheetTitle id={titleId}>{title}</SheetTitle>
+            <SheetTitle>{title}</SheetTitle>
             <SheetDescription>{subtitle}</SheetDescription>
           </SheetHeader>
           <Body data={data} series={series} className="px-6 pb-8" />
@@ -63,9 +59,9 @@ export function GrowthDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-labelledby={titleId} className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle id={titleId}>{title}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{subtitle}</DialogDescription>
         </DialogHeader>
         <Body data={data} series={series} />

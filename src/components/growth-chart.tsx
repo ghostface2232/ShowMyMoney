@@ -44,6 +44,7 @@ export function GrowthChart({ data, series }: Props) {
           <CartesianGrid
             vertical={false}
             stroke="var(--border)"
+            strokeWidth={1.2}
             strokeDasharray="2 4"
           />
           <XAxis

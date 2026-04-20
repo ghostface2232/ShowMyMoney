@@ -9,7 +9,7 @@ import {
   useReducedMotion,
   type Transition,
 } from "motion/react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Target, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { createGoal, deleteGoal, updateGoal } from "@/actions/goals";
@@ -140,7 +140,12 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
         }}
       >
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-w-26 justify-start gap-2.5 border-transparent bg-white text-foreground hover:bg-white/70 aria-expanded:bg-white/70"
+          >
+            <Target className="size-4" />
             목표 분석
           </Button>
         </DialogTrigger>
@@ -243,7 +248,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
                     type="button"
                     onClick={startCreating}
                     disabled={pending}
-                    className="inline-flex w-fit items-center gap-1 self-start px-1 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                    className="inline-flex h-7 w-fit cursor-pointer items-center gap-1 self-start rounded-full px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
                   >
                     <Plus className="size-3.5" />
                     새 목표 추가

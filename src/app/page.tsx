@@ -43,7 +43,7 @@ export default async function HomePage() {
         currentTotalAssets={currentTotalAssets}
         hasSnapshot={hasSnapshot}
       />
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-3 pb-6 md:px-8">
         <SummaryCards dashboard={dashboard} />
         <AssetTable dashboard={dashboard} />
       </main>

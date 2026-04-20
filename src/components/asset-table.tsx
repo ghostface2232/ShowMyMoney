@@ -73,6 +73,9 @@ type ActionResult = { ok: true } | { ok: false; error: string };
 
 type RunAction = (action: () => Promise<ActionResult>) => Promise<void>;
 
+const INPUT_NO_FOCUS_RING =
+  "focus-visible:border-transparent focus-visible:ring-0";
+
 type GroupDeleteTarget =
   | { kind: "group"; id: string; name: string; categoryCount: number }
   | { kind: "category"; id: string; name: string };
@@ -113,7 +116,7 @@ export function AssetTable({ dashboard }: Props) {
   const hasGroups = dashboard.categoryTree.length > 0;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 pb-8">
       {hasSnapshots ? (
         <>
           {hasGroups ? (
@@ -215,12 +218,12 @@ function AddGroupRow({
     );
   }
   return (
-    <div className="px-1">
+    <div className="px-1 pb-4">
       <button
         type="button"
         onClick={() => setAddingGroup(true)}
         disabled={pending}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-white/70 disabled:pointer-events-none disabled:opacity-50"
       >
         <Plus className="size-3.5" />
         새 그룹 추가
@@ -289,7 +292,7 @@ function NameColumn({ categories }: NameColumnProps) {
   return (
     <div
       className="sticky left-0 z-10 flex shrink-0 flex-col bg-card"
-      style={{ width: 96, minWidth: 96, maxWidth: 96, flexBasis: 96 }}
+      style={{ width: 104, minWidth: 104, maxWidth: 104, flexBasis: 104 }}
     >
       <div className="h-10" />
       {categories.map((cat) => (
@@ -315,7 +318,7 @@ function TableRowDividers({ rowCount }: { rowCount: number }) {
       {Array.from({ length: lineCount }, (_, index) => (
         <span
           key={index}
-          className="absolute inset-x-0 border-t"
+          className="absolute inset-x-0 border-t-[1.2px]"
           style={{ top: 40 + index * 44 }}
         />
       ))}
@@ -391,9 +394,9 @@ function GroupManagementDialog({
           <Button
             type="button"
             variant="ghost"
-            size="icon-xs"
+            size="icon-sm"
             disabled={disabled}
-            className="shrink-0 rounded-full bg-foreground/7 text-muted-foreground transition-colors hover:bg-foreground/12 hover:text-foreground dark:bg-foreground/14 dark:hover:bg-foreground/20"
+            className="size-7 shrink-0 rounded-full bg-foreground/7 text-muted-foreground transition-colors hover:bg-foreground/16 hover:text-foreground sm:size-6"
             aria-label={`${group.name} 관리`}
           >
             <MoreHorizontal className="size-3.5" />
@@ -424,7 +427,11 @@ function GroupManagementDialog({
               </div>
 
               {group.categories.length > 0 ? (
-                <motion.ul layout transition={transition} className="divide-y">
+                <motion.ul
+                  layout
+                  transition={transition}
+                  className="divide-y-[1.2px]"
+                >
                   <AnimatePresence initial={false}>
                     {group.categories.map((category, index) => (
                       <GroupCategoryRow
@@ -477,11 +484,10 @@ function GroupManagementDialog({
                   placeholder="새 항목 이름"
                   disabled={disabled}
                   maxLength={40}
-                  className="h-8 px-3"
+                  className={`h-8 px-3 ${INPUT_NO_FOCUS_RING}`}
                 />
                 <Button
                   type="button"
-                  variant="outline"
                   size="sm"
                   onClick={addCategory}
                   disabled={disabled || newCategory.trim().length === 0}
@@ -688,7 +694,7 @@ function EditableDialogTitle({
           }}
           disabled={disabled}
           maxLength={40}
-          className="rounded bg-transparent px-0 outline-none"
+          className="cursor-text rounded bg-transparent px-0 outline-none transition-colors hover:bg-muted/60"
         />
       </DialogTitle>
     );
@@ -703,7 +709,7 @@ function EditableDialogTitle({
         type="button"
         onClick={start}
         disabled={disabled}
-        className="truncate rounded px-0 text-left transition-colors hover:text-foreground/80 disabled:opacity-50"
+        className="cursor-pointer truncate rounded px-1 text-left transition-colors hover:bg-muted/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
       >
         {value}
       </button>
@@ -758,7 +764,7 @@ function SnapshotColumn({
         width: sizeTransition,
       }}
       initial={{ opacity: 0, width: 0 }}
-      animate={{ opacity: 1, width: 120 }}
+      animate={{ opacity: 1, width: 132 }}
       exit={{ opacity: 0, width: 0 }}
       style={{ willChange: "transform, opacity, width" }}
       className="z-10 flex shrink-0 flex-col overflow-hidden pl-3"
@@ -835,7 +841,7 @@ function AmountCell({
 
   if (editing) {
     return (
-      <div className="flex h-11 w-full items-center gap-0.5 px-1 ring-1 ring-ring/60 ring-inset">
+      <div className="flex h-11 w-full items-center gap-0.5 px-1">
         <input
           autoFocus
           inputMode="numeric"
@@ -853,7 +859,7 @@ function AmountCell({
             }
           }}
           placeholder="0"
-          className="h-8 min-w-0 flex-1 bg-transparent px-2 text-right text-sm tabular-nums focus:outline-none"
+          className="h-8 min-w-0 flex-1 cursor-text rounded-full bg-transparent px-2 text-right text-sm tabular-nums transition-colors hover:bg-muted/60 focus:outline-none"
         />
         {entry ? (
           <Button
@@ -877,7 +883,7 @@ function AmountCell({
       type="button"
       onClick={start}
       disabled={disabled}
-      className="flex h-11 w-full items-center justify-end px-3 text-right text-sm tabular-nums transition-colors hover:bg-muted/40 disabled:opacity-60"
+      className="flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums transition-colors hover:bg-muted/70 disabled:pointer-events-none disabled:opacity-60"
     >
       {amount !== null ? (
         formatKRW(amount)
@@ -931,7 +937,7 @@ function InlineNameInput({
       placeholder={placeholder}
       disabled={disabled}
       maxLength={40}
-      className="rounded bg-transparent px-1 text-left text-sm outline-none ring-1 ring-ring/60 ring-inset placeholder:text-muted-foreground/60"
+      className="cursor-text rounded bg-transparent px-1 text-left text-sm outline-none ring-1 ring-ring/60 ring-inset transition-colors placeholder:text-muted-foreground/60 hover:bg-input/70"
     />
   );
 }
