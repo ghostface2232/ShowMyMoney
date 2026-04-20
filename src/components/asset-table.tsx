@@ -596,7 +596,7 @@ type NameColumnProps = {
 function NameColumn({ categories }: NameColumnProps) {
   return (
     <div
-      className="sticky left-0 z-10 flex shrink-0 flex-col bg-card"
+      className="sticky left-0 z-20 flex shrink-0 flex-col bg-card"
       style={{ width: 104, minWidth: 104, maxWidth: 104, flexBasis: 104 }}
     >
       <div className="h-10" />
@@ -611,6 +611,10 @@ function NameColumn({ categories }: NameColumnProps) {
       <div className="flex h-11 min-w-0 items-center text-sm font-medium">
         <span className="block min-w-0 truncate px-1">합계</span>
       </div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-full w-4 bg-gradient-to-r from-card to-transparent"
+      />
     </div>
   );
 }
@@ -619,7 +623,7 @@ function TableRowDividers({ rowCount }: { rowCount: number }) {
   const lineCount = Math.max(rowCount, 1);
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-20">
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-30">
       {Array.from({ length: lineCount }, (_, index) => (
         <span
           key={index}
