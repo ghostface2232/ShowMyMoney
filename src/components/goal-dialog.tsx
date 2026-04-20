@@ -13,6 +13,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { createGoal, deleteGoal, updateGoal } from "@/actions/goals";
+import { CountUp } from "@/components/count-up";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,7 @@ import {
   statusOf,
   type GoalStatus,
 } from "@/lib/goal-math";
+import { SPRING_SOFT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { Goal } from "@/types/db";
 
@@ -58,9 +60,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const reducedMotion = useReducedMotion();
-  const transition: Transition = reducedMotion
-    ? { duration: 0 }
-    : { type: "spring", stiffness: 280, damping: 32 };
+  const transition: Transition = reducedMotion ? { duration: 0 } : SPRING_SOFT;
 
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -173,6 +173,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -6 }}
                           transition={transition}
+                          style={{ willChange: "transform, opacity" }}
                         >
                           <GoalForm
                             draft={draft}
@@ -191,6 +192,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -6, height: 0 }}
                           transition={transition}
+                          style={{ willChange: "transform, opacity" }}
                           className="overflow-hidden"
                         >
                           <GoalItem
@@ -295,9 +297,11 @@ function CurrentAssetsHeader({
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs text-muted-foreground">현재 총자산</span>
-      <span className="font-heading text-3xl font-semibold tabular-nums">
-        {formatKRW(currentTotalAssets)}
-      </span>
+      <CountUp
+        value={currentTotalAssets}
+        format={formatKRW}
+        className="font-heading text-3xl font-semibold tabular-nums"
+      />
     </div>
   );
 }

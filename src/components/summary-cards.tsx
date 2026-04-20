@@ -2,14 +2,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 import type { CategoryGroupWithCategories } from "@/actions/categories";
 import type { DashboardData, SnapshotWithEntries } from "@/actions/dashboard";
+import { CountUp } from "@/components/count-up";
 import { Card } from "@/components/ui/card";
 import { GrowthDialog } from "@/components/growth-dialog";
 import { formatKRW } from "@/lib/format";
 import { calcMultiGrowthSeries } from "@/lib/growth-math";
+import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 type CardDatum = {
@@ -69,8 +71,9 @@ export function SummaryCards({ dashboard }: Props) {
               transition={
                 reducedMotion
                   ? { duration: 0 }
-                  : { duration: 0.3, delay: index * 0.05, ease: "easeOut" }
+                  : { duration: DURATION_BASE, delay: index * 0.04, ease: EASE_OUT }
               }
+              style={{ willChange: "transform, opacity" }}
               className={cn(
                 "relative flex min-w-0 cursor-pointer flex-col justify-center gap-1 bg-card px-4 py-4 text-left transition-colors",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
@@ -91,21 +94,14 @@ export function SummaryCards({ dashboard }: Props) {
               <span className="truncate text-xs text-muted-foreground">
                 {card.label}
               </span>
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={card.amount}
-                  initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                  className={cn(
-                    "font-heading text-base tabular-nums sm:text-lg",
-                    card.fullWidthOnMobile ? "font-semibold" : "font-medium",
-                  )}
-                >
-                  {formatKRW(card.amount)}
-                </motion.span>
-              </AnimatePresence>
+              <CountUp
+                value={card.amount}
+                format={formatKRW}
+                className={cn(
+                  "font-heading text-base tabular-nums sm:text-lg",
+                  card.fullWidthOnMobile ? "font-semibold" : "font-medium",
+                )}
+              />
               {card.delta !== null ? (
                 <DeltaBadge delta={card.delta} pct={card.deltaPct} />
               ) : null}
