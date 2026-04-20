@@ -69,6 +69,8 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<
     { id: string; label: string } | null
   >(null);
+  // 레이아웃 애니메이션 도중 overflow-y-auto가 일시적으로 스크롤바를 띄우는 걸 막기 위한 가드.
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const today = useMemo(() => new Date(), []);
 
@@ -157,7 +159,16 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex min-h-0 flex-col gap-5 overflow-y-auto pr-1">
+          <motion.div
+            layout
+            transition={transition}
+            onLayoutAnimationStart={() => setIsAnimating(true)}
+            onLayoutAnimationComplete={() => setIsAnimating(false)}
+            className={cn(
+              "flex min-h-0 flex-col gap-5 pr-1",
+              isAnimating ? "overflow-hidden" : "overflow-y-auto",
+            )}
+          >
             <CurrentAssetsHeader
               hasSnapshot={hasSnapshot}
               currentTotalAssets={currentTotalAssets}
@@ -256,7 +267,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
                 )}
               </AnimatePresence>
             </section>
-          </div>
+          </motion.div>
         </DialogContent>
       </Dialog>
 
