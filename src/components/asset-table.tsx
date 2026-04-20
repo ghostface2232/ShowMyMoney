@@ -62,6 +62,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { YearMonthPicker } from "@/components/year-month-picker";
 import { formatKRW, formatYearMonth } from "@/lib/format";
+import { DURATION_BASE, EASE_OUT, SPRING_SOFT } from "@/lib/motion";
 import type { Category } from "@/types/db";
 
 type Props = {
@@ -82,9 +83,7 @@ export function AssetTable({ dashboard }: Props) {
   const [addingGroup, setAddingGroup] = useState(false);
 
   const reducedMotion = useReducedMotion();
-  const transition: Transition = reducedMotion
-    ? { duration: 0 }
-    : { type: "spring", stiffness: 280, damping: 32 };
+  const transition: Transition = reducedMotion ? { duration: 0 } : SPRING_SOFT;
 
   const existingYearMonths = useMemo(
     () => new Set(dashboard.snapshots.map((s) => s.year_month)),
@@ -339,9 +338,7 @@ function GroupManagementDialog({
     null,
   );
   const reducedMotion = useReducedMotion();
-  const transition: Transition = reducedMotion
-    ? { duration: 0 }
-    : { type: "spring", stiffness: 280, damping: 32 };
+  const transition: Transition = reducedMotion ? { duration: 0 } : SPRING_SOFT;
 
   async function saveGroupName(value: string) {
     const trimmed = value.trim();
@@ -745,14 +742,26 @@ function SnapshotColumn({
     return total;
   }, [snapshot.entriesByCategory, categories]);
 
+  // 너비는 duration 기반 ease-out으로 정착시켜 스프링 특유의 미세한 바운스를 피한다.
+  // 사이드로 밀려나는 형제 열은 `layout`이 transform 기반 FLIP으로 처리해 GPU 가속을 유지한다.
+  const sizeTransition =
+    "duration" in transition
+      ? transition
+      : { duration: DURATION_BASE, ease: EASE_OUT };
+
   return (
     <motion.div
       layout
-      transition={transition}
+      transition={{
+        layout: transition,
+        opacity: sizeTransition,
+        width: sizeTransition,
+      }}
       initial={{ opacity: 0, width: 0 }}
       animate={{ opacity: 1, width: 120 }}
       exit={{ opacity: 0, width: 0 }}
-      className="z-10 flex w-30 shrink-0 flex-col overflow-hidden pl-3"
+      style={{ willChange: "transform, opacity, width" }}
+      className="z-10 flex shrink-0 flex-col overflow-hidden pl-3"
     >
       <div className="flex h-10 items-center justify-end px-3 text-sm font-medium text-muted-foreground">
         <span className="truncate">

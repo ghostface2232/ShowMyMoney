@@ -41,8 +41,21 @@ Design reference points: Notion database tables, Figma UI3, Claude web. The visu
 - The asset table orders snapshots with the most recent on the left.
 - Dark mode is supported end-to-end. The theme toggle sits at the top-right of the header.
 - Work with Luma's design tokens instead of overriding them. Borders lean toward rounded (`rounded-xl` and above for cards), shadows stay soft, spacing stays generous. Avoid sharp corners, heavy borders, or dense padding that would fight the preset.
-- Motion usage favors `layout`, `layoutId`, and `AnimatePresence` for layout-sharing transitions. Default spring transition: `{ type: "spring", stiffness: 380, damping: 34 }`. Consider softening to `stiffness: 280, damping: 32` if animations feel too snappy against Luma's calmer visual rhythm.
-- Respect `useReducedMotion` in the root motion shell: reduce durations to near-zero when the OS requests reduced motion.
+- Motion usage favors `layout`, `layoutId`, and `AnimatePresence` for layout-sharing transitions. All tunables live in `src/lib/motion.ts` — import constants from there instead of hard-coding values.
+- Animation constants (defined in `src/lib/motion.ts`):
+  - `SPRING_DEFAULT` — `{ type: "spring", stiffness: 380, damping: 34 }`. Default for small, interactive elements (buttons, micro transitions).
+  - `SPRING_SOFT` — `{ type: "spring", stiffness: 280, damping: 32 }`. Calmer rhythm for list reorders, card reflow, modal bodies. Use this when `SPRING_DEFAULT` feels too snappy against the Luma visual rhythm.
+  - `SPRING_LAYOUT` — `{ type: "spring", stiffness: 320, damping: 34, mass: 0.9 }`. Layout-sharing (FLIP) transitions that benefit from a touch of settle.
+  - `EASE_OUT` — cubic-bezier `[0.22, 1, 0.36, 1]`. Duration-based decelerating curve for page fades, CountUp, entry animations.
+  - `EASE_IN_OUT` — cubic-bezier `[0.65, 0, 0.35, 1]`. Symmetric curve for toggles.
+  - `DURATION_FAST` `0.18s` / `DURATION_BASE` `0.28s` / `DURATION_SLOW` `0.4s`.
+  - `COUNT_UP_DURATION_MS` `420ms`. rAF-based summary-card number counts.
+- Page transitions are handled by `src/components/motion-shell.tsx` (client): it keys on `usePathname()` inside `AnimatePresence mode="wait"` and applies fade + slight y offset (`{ opacity: 0, y: 6 }` → `{ opacity: 1, y: 0 }` → `{ opacity: 0, y: -4 }`) via `DURATION_BASE` + `EASE_OUT`.
+- Number transitions (summary cards, current-total header in the goal dialog) use `src/components/count-up.tsx`, a rAF-based CountUp that eases from the previous displayed value to the new value with a cubic ease-out. Do not introduce external counting libraries.
+- Snapshot column insertion uses `layout` + `AnimatePresence` on the column list: the new column animates `width` 0 → 120 with `EASE_OUT` (avoiding spring bounce on the layout axis) while siblings reflow via `SPRING_SOFT` transforms (GPU-accelerated FLIP).
+- Keep animations on `transform` and `opacity` wherever possible. Add `style={{ willChange: "transform, opacity" }}` on elements that are likely to animate repeatedly to hint the compositor.
+- Do not override the built-in animations on shadcn Dialog / Sheet primitives — they already match the overall rhythm.
+- Respect `useReducedMotion` everywhere motion is introduced: zero durations or skip the animation entirely when the OS requests reduced motion. `MotionShell` and `CountUp` already handle this.
 - Both the asset table and the growth chart order snapshots with the most recent month on the left so users always compare back from the latest data point. Chart data is computed in ascending order for delta math, then reversed at the render boundary for display.
 - Growth / trend charts are responsive: wrap the Recharts component in `ResponsiveContainer` so it fills the parent container's width, and use `maxBarSize` to keep individual bars from becoming overly wide when snapshots are few. Y-axis labels use `formatKRWCompact` (만/억 units) so the axis stays narrow.
 
