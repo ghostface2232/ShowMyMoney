@@ -1,9 +1,9 @@
-// 헤더 좌측 아바타 DropdownMenu. 프로필 설정 Dialog(표시 이름/PIN 변경/계정 삭제)와 로그아웃을 제공한다.
+// 헤더 좌측 아바타. 클릭 시 프로필 설정 Dialog(표시 이름/PIN 변경/로그아웃/계정 삭제)를 연다.
 "use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Settings, Trash2 } from "lucide-react";
+import { LogOut, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { signOut } from "@/actions/auth";
@@ -30,13 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -51,38 +44,20 @@ export function ProfileMenu({ displayName, firstUsedAt }: Props) {
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="group flex cursor-pointer items-center gap-3 rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-            aria-label="프로필 메뉴"
-          >
-            <span
-              aria-hidden
-              className="inline-flex size-8 items-center justify-center rounded-full bg-muted text-sm font-medium"
-            >
-              {initial}
-            </span>
-            <span className="text-sm font-medium">{displayName}</span>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-40">
-          <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
-            <Settings className="size-3.5" />
-            프로필 설정
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={() => {
-              void signOut();
-            }}
-          >
-            <LogOut className="size-3.5" />
-            로그아웃
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <button
+        type="button"
+        onClick={() => setProfileOpen(true)}
+        className="group flex cursor-pointer items-center gap-3 rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        aria-label="프로필 설정 열기"
+      >
+        <span
+          aria-hidden
+          className="inline-flex size-8 items-center justify-center rounded-full bg-muted text-sm font-medium"
+        >
+          {initial}
+        </span>
+        <span className="text-sm font-medium">{displayName}</span>
+      </button>
 
       <ProfileDialog
         open={profileOpen}
@@ -252,6 +227,26 @@ function ProfileDialog({
                   PIN 변경
                 </Button>
               </div>
+            </section>
+
+            <section className="flex items-center justify-between gap-2">
+              <div className="flex flex-col gap-0.5">
+                <Label>로그아웃</Label>
+                <p className="text-xs text-muted-foreground">
+                  현재 기기에서 세션을 종료합니다.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void signOut();
+                }}
+              >
+                <LogOut className="size-3.5" />
+                로그아웃
+              </Button>
             </section>
 
             <section className="flex flex-col gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
