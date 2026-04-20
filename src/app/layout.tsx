@@ -1,10 +1,9 @@
-// 루트 레이아웃. 전역 폰트 변수, next-themes Provider, sonner Toaster를 붙인다.
+// 루트 레이아웃. 전역 폰트 변수, 모션 셸, sonner Toaster를 붙인다.
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 import { MotionShell } from "@/components/motion-shell";
-import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -30,19 +29,12 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      style={{ colorScheme: "light" }}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <MotionShell>{children}</MotionShell>
-          <Toaster />
-        </ThemeProvider>
+        <MotionShell>{children}</MotionShell>
+        <Toaster />
       </body>
     </html>
   );
