@@ -98,3 +98,10 @@ RLS is enabled on every table with no policies. This blocks any access via the p
 - `getDashboardData` loads all snapshots in a single query. Paginate or lazy-load historical snapshots when the count climbs past roughly 24.
 - No offline write support. The service worker caches the app shell and shows an offline fallback page; data writes require network.
 - No realtime cross-device sync. Other devices pick up changes on reload. Supabase Realtime could be added later if needed.
+
+## Deployment
+
+- The app is a PWA. `@serwist/next` compiles `src/app/sw.ts` into `public/sw.js` at build time, and the manifest is emitted at `/manifest.webmanifest` via `src/app/manifest.ts`.
+- 서비스 워커가 이전 버전을 캐시할 수 있으므로 배포 후 테스트 시 새로고침 두 번(하드 리로드) 권장.
+- 로컬 개발(`npm run dev`)에서는 Serwist를 자동 비활성화한다(`disable: process.env.NODE_ENV === "development"`). 서비스 워커 동작을 확인하려면 `npm run build && npm run start`로 프로덕션 빌드를 구동한다.
+- PWA 아이콘은 `public/icons/` 아래의 임시 PNG(SMM 이니셜)로, 최종 브랜딩이 정해지면 동일 경로/사이즈로 교체한다.

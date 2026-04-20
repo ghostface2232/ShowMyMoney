@@ -1,5 +1,5 @@
-// 루트 레이아웃. 전역 폰트 변수, 모션 셸, sonner Toaster를 붙인다.
-import type { Metadata } from "next";
+// 루트 레이아웃. 전역 폰트 변수, 모션 셸, sonner Toaster, PWA 메타데이터를 붙인다.
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
@@ -19,6 +19,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ShowMyMoney",
   description: "월별 자산 스냅샷과 저축 목표 분석",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "ShowMyMoney",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
 };
 
 export default function RootLayout({
