@@ -102,7 +102,10 @@ export function AssetTable({ dashboard }: Props) {
   const localDashboardRef = useRef(dashboard);
   const serverDashboardRef = useRef(dashboard);
   const pendingBackgroundCountRef = useRef(0);
-  const canceledEntryIdsRef = useRef(new Set<string>());
+  // 동일 셀의 연속 변경 시 어느 응답이 최신인지 판별. 응답이 stale이면 UI에 반영하지 않는다.
+  const cellGenerationRef = useRef(new Map<string, number>());
+  // 낙관적 엔트리가 서버에 반영되기 전에 삭제된 경우, 서버 ID가 확인되는 즉시 정리하도록 표시한다.
+  const cellDeletionPendingRef = useRef(new Set<string>());
 
   const reducedMotion = useReducedMotion();
   const transition: Transition = reducedMotion ? { duration: 0 } : SPRING_SOFT;
@@ -348,6 +351,10 @@ export function AssetTable({ dashboard }: Props) {
       runInBackground(reorderCategories(groupId, orderedIds));
     },
     upsertEntry(snapshotId, categoryId, amount) {
+      const key = cellKey(snapshotId, categoryId);
+      const generation = bumpCellGeneration(cellGenerationRef.current, key);
+      cellDeletionPendingRef.current.delete(key);
+
       const existing =
         localDashboardRef.current.snapshots.find(
           (snapshot) => snapshot.id === snapshotId,
@@ -377,9 +384,12 @@ export function AssetTable({ dashboard }: Props) {
         ),
       }));
       runInBackground(upsertEntry(snapshotId, categoryId, amount), (result) => {
-        if (canceledEntryIdsRef.current.has(optimisticId)) {
-          canceledEntryIdsRef.current.delete(optimisticId);
-          void deleteEntry(result.entry.id).then(() => refresh());
+        const isStale = cellGenerationRef.current.get(key) !== generation;
+        if (isStale) {
+          if (cellDeletionPendingRef.current.has(key)) {
+            cellDeletionPendingRef.current.delete(key);
+            runInBackground(deleteEntry(result.entry.id));
+          }
           return;
         }
         setLocalDashboard((current) => ({
@@ -401,6 +411,8 @@ export function AssetTable({ dashboard }: Props) {
     deleteEntry(entryId) {
       const location = findEntryLocation(localDashboardRef.current, entryId);
       if (!location) return;
+      const key = cellKey(location.snapshotId, location.categoryId);
+      bumpCellGeneration(cellGenerationRef.current, key);
 
       setLocalDashboard((current) => ({
         ...current,
@@ -418,7 +430,7 @@ export function AssetTable({ dashboard }: Props) {
       }));
 
       if (isOptimisticId(entryId)) {
-        canceledEntryIdsRef.current.add(entryId);
+        cellDeletionPendingRef.current.add(key);
         return;
       }
       runInBackground(deleteEntry(entryId));
@@ -452,11 +464,7 @@ export function AssetTable({ dashboard }: Props) {
           />
         </>
       ) : (
-        <EmptyState
-          existing={existingYearMonths}
-          onSelect={addSnapshot}
-          disabled={false}
-        />
+        <EmptyState existing={existingYearMonths} onSelect={addSnapshot} />
       )}
     </div>
   );
@@ -465,11 +473,9 @@ export function AssetTable({ dashboard }: Props) {
 function EmptyState({
   existing,
   onSelect,
-  disabled,
 }: {
   existing: Set<number>;
   onSelect: (yearMonth: number) => void;
-  disabled: boolean;
 }) {
   return (
     <Card className="shadow-none ring-0">
@@ -480,9 +486,8 @@ function EmptyState({
         <YearMonthPicker
           existing={existing}
           onSelect={onSelect}
-          disabled={disabled}
           trigger={
-            <Button size="sm" disabled={disabled}>
+            <Button size="sm">
               <Plus className="size-4" />첫 달 추가
             </Button>
           }
@@ -516,7 +521,6 @@ function AddGroupRow({
       <div className="px-1">
         <InlineNameInput
           placeholder="새 그룹 이름"
-          disabled={false}
           onCancel={() => setAddingGroup(false)}
           onSave={(name) => {
             setAddingGroup(false);
@@ -559,11 +563,7 @@ function GroupSection({
         <h2 className="min-w-0 truncate px-1 text-2xl font-semibold">
           {group.name}
         </h2>
-        <GroupManagementDialog
-          group={group}
-          disabled={false}
-          actions={actions}
-        />
+        <GroupManagementDialog group={group} actions={actions} />
       </div>
 
       <Card className="p-4 shadow-none ring-0">
@@ -577,7 +577,6 @@ function GroupSection({
                   key={snap.id}
                   snapshot={snap}
                   categories={group.categories}
-                  disabled={false}
                   actions={actions}
                   transition={transition}
                 />
@@ -634,11 +633,9 @@ function TableRowDividers({ rowCount }: { rowCount: number }) {
 
 function GroupManagementDialog({
   group,
-  disabled,
   actions,
 }: {
   group: CategoryGroupWithCategories;
-  disabled: boolean;
   actions: TableActions;
 }) {
   const [open, setOpen] = useState(false);
@@ -699,7 +696,6 @@ function GroupManagementDialog({
             type="button"
             variant="ghost"
             size="icon-sm"
-            disabled={disabled}
             className="size-7 shrink-0 rounded-full bg-foreground/7 text-muted-foreground transition-colors hover:bg-foreground/16 hover:text-foreground sm:size-6"
             aria-label={`${group.name} 관리`}
           >
@@ -708,11 +704,7 @@ function GroupManagementDialog({
         </DialogTrigger>
         <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-lg">
           <DialogHeader className="items-start pr-10">
-            <EditableDialogTitle
-              value={group.name}
-              disabled={disabled}
-              onSave={saveGroupName}
-            />
+            <EditableDialogTitle value={group.name} onSave={saveGroupName} />
           </DialogHeader>
 
           <motion.div
@@ -741,7 +733,6 @@ function GroupManagementDialog({
                       <GroupCategoryRow
                         key={category.id}
                         category={category}
-                        disabled={disabled}
                         canMoveUp={index > 0}
                         canMoveDown={index < group.categories.length - 1}
                         transition={transition}
@@ -786,7 +777,6 @@ function GroupManagementDialog({
                     }
                   }}
                   placeholder="새 항목 이름"
-                  disabled={disabled}
                   maxLength={40}
                   className={`h-8 px-3 ${INPUT_NO_FOCUS_RING}`}
                 />
@@ -794,7 +784,7 @@ function GroupManagementDialog({
                   type="button"
                   size="sm"
                   onClick={addCategory}
-                  disabled={disabled || newCategory.trim().length === 0}
+                  disabled={newCategory.trim().length === 0}
                 >
                   <Plus className="size-4" />
                   추가
@@ -807,7 +797,6 @@ function GroupManagementDialog({
                 type="button"
                 variant="destructive"
                 size="sm"
-                disabled={disabled}
                 onClick={() =>
                   setDeleteTarget({
                     kind: "group",
@@ -852,7 +841,6 @@ function GroupManagementDialog({
 
 function GroupCategoryRow({
   category,
-  disabled,
   canMoveUp,
   canMoveDown,
   transition,
@@ -861,7 +849,6 @@ function GroupCategoryRow({
   onDelete,
 }: {
   category: Category;
-  disabled: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   transition: Transition;
@@ -906,7 +893,6 @@ function GroupCategoryRow({
             event.currentTarget.blur();
           }
         }}
-        disabled={disabled}
         maxLength={40}
         className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:border-transparent focus-visible:bg-transparent focus-visible:ring-0"
       />
@@ -914,7 +900,7 @@ function GroupCategoryRow({
         type="button"
         variant="ghost"
         size="icon-sm"
-        disabled={disabled || !canMoveUp}
+        disabled={!canMoveUp}
         onClick={() => onMove(-1)}
         aria-label={`${category.name} 위로 이동`}
       >
@@ -924,7 +910,7 @@ function GroupCategoryRow({
         type="button"
         variant="ghost"
         size="icon-sm"
-        disabled={disabled || !canMoveDown}
+        disabled={!canMoveDown}
         onClick={() => onMove(1)}
         aria-label={`${category.name} 아래로 이동`}
       >
@@ -934,7 +920,6 @@ function GroupCategoryRow({
         type="button"
         variant="ghost"
         size="icon-sm"
-        disabled={disabled}
         onClick={onDelete}
         className="text-muted-foreground hover:text-destructive"
         aria-label={`${category.name} 삭제`}
@@ -947,18 +932,15 @@ function GroupCategoryRow({
 
 function EditableDialogTitle({
   value,
-  disabled,
   onSave,
 }: {
   value: string;
-  disabled: boolean;
   onSave: (value: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
   function start() {
-    if (disabled) return;
     setDraft(value);
     setEditing(true);
   }
@@ -996,7 +978,6 @@ function EditableDialogTitle({
               cancel();
             }
           }}
-          disabled={disabled}
           maxLength={40}
           className="cursor-text rounded bg-transparent px-0 outline-none transition-colors hover:bg-muted/60"
         />
@@ -1012,8 +993,7 @@ function EditableDialogTitle({
       <button
         type="button"
         onClick={start}
-        disabled={disabled}
-        className="cursor-pointer truncate rounded px-1 text-left transition-colors hover:bg-muted/70 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+        className="cursor-pointer truncate rounded px-1 text-left transition-colors hover:bg-muted/70 hover:text-foreground"
       >
         {value}
       </button>
@@ -1032,7 +1012,6 @@ function getGroupDeleteMessage(target: GroupDeleteTarget | null): string {
 type SnapshotColumnProps = {
   snapshot: SnapshotWithEntries;
   categories: Category[];
-  disabled: boolean;
   actions: TableActions;
   transition: Transition;
 };
@@ -1040,7 +1019,6 @@ type SnapshotColumnProps = {
 function SnapshotColumn({
   snapshot,
   categories,
-  disabled,
   actions,
   transition,
 }: SnapshotColumnProps) {
@@ -1085,7 +1063,6 @@ function SnapshotColumn({
           snapshotId={snapshot.id}
           categoryId={cat.id}
           entry={snapshot.entriesByCategory[cat.id]}
-          disabled={disabled}
           actions={actions}
         />
       ))}
@@ -1101,7 +1078,6 @@ type AmountCellProps = {
   snapshotId: string;
   categoryId: string;
   entry: SnapshotWithEntries["entriesByCategory"][string] | undefined;
-  disabled: boolean;
   actions: TableActions;
 };
 
@@ -1109,7 +1085,6 @@ function AmountCell({
   snapshotId,
   categoryId,
   entry,
-  disabled,
   actions,
 }: AmountCellProps) {
   const [editing, setEditing] = useState(false);
@@ -1186,8 +1161,7 @@ function AmountCell({
     <button
       type="button"
       onClick={start}
-      disabled={disabled}
-      className="flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums transition-colors hover:bg-muted/70 disabled:pointer-events-none disabled:opacity-60"
+      className="flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums transition-colors hover:bg-muted/70"
     >
       {amount !== null ? (
         formatKRW(amount)
@@ -1202,12 +1176,10 @@ function InlineNameInput({
   placeholder,
   onSave,
   onCancel,
-  disabled,
 }: {
   placeholder: string;
   onSave: (name: string) => void;
   onCancel: () => void;
-  disabled: boolean;
 }): ReactNode {
   const [draft, setDraft] = useState("");
 
@@ -1239,7 +1211,6 @@ function InlineNameInput({
       onBlur={commit}
       onKeyDown={onKeyDown}
       placeholder={placeholder}
-      disabled={disabled}
       maxLength={40}
       className="cursor-text rounded bg-transparent px-1 text-left text-sm outline-none ring-1 ring-ring/60 ring-inset transition-colors placeholder:text-muted-foreground/60 hover:bg-input/70"
     />
@@ -1254,6 +1225,19 @@ function createTempId(kind: string): string {
 
 function isOptimisticId(id: string): boolean {
   return id.startsWith("optimistic-");
+}
+
+function cellKey(snapshotId: string, categoryId: string): string {
+  return `${snapshotId}\u0000${categoryId}`;
+}
+
+function bumpCellGeneration(
+  generations: Map<string, number>,
+  key: string,
+): number {
+  const next = (generations.get(key) ?? 0) + 1;
+  generations.set(key, next);
+  return next;
 }
 
 function omitEntries(
