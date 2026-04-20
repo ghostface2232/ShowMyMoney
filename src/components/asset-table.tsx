@@ -535,7 +535,7 @@ function AddGroupRow({
       <button
         type="button"
         onClick={() => setAddingGroup(true)}
-        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-white/70 disabled:pointer-events-none disabled:opacity-50"
+        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-white px-4 text-sm font-medium text-foreground disabled:pointer-events-none disabled:opacity-50"
       >
         <Plus className="size-3.5" />
         새 그룹 추가
@@ -700,7 +700,7 @@ function GroupManagementDialog({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="size-7 shrink-0 rounded-full bg-foreground/7 text-muted-foreground transition-colors hover:bg-foreground/16 hover:text-foreground sm:size-6"
+            className="size-7 shrink-0 rounded-full bg-foreground/7 text-muted-foreground sm:size-6"
             aria-label={`${group.name} 관리`}
           >
             <MoreHorizontal className="size-3.5" />
@@ -983,7 +983,7 @@ function EditableDialogTitle({
             }
           }}
           maxLength={40}
-          className="cursor-text rounded bg-transparent px-0 outline-none transition-colors hover:bg-muted/60"
+          className="cursor-text rounded bg-transparent px-0 outline-none"
         />
       </DialogTitle>
     );
@@ -997,7 +997,7 @@ function EditableDialogTitle({
       <button
         type="button"
         onClick={start}
-        className="cursor-pointer truncate rounded px-1 text-left transition-colors hover:bg-muted/70 hover:text-foreground"
+        className="cursor-pointer truncate rounded px-1 text-left"
       >
         {value}
       </button>
@@ -1142,7 +1142,7 @@ function AmountCell({
             }
           }}
           placeholder="0"
-          className="h-8 min-w-0 flex-1 cursor-text rounded-full bg-transparent px-2 text-right text-sm tabular-nums transition-colors hover:bg-muted/60 focus:outline-none"
+          className="h-8 min-w-0 flex-1 cursor-text rounded-full bg-transparent px-2 text-right text-sm tabular-nums focus:outline-none"
         />
         {entry ? (
           <Button
@@ -1165,7 +1165,7 @@ function AmountCell({
     <button
       type="button"
       onClick={start}
-      className="flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums transition-colors hover:bg-muted/70"
+      className="flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums"
     >
       {amount !== null ? (
         formatKRW(amount)
@@ -1216,7 +1216,7 @@ function InlineNameInput({
       onKeyDown={onKeyDown}
       placeholder={placeholder}
       maxLength={40}
-      className="cursor-text rounded bg-transparent px-1 text-left text-sm outline-none ring-1 ring-ring/60 ring-inset transition-colors placeholder:text-muted-foreground/60 hover:bg-input/70"
+      className="cursor-text rounded bg-transparent px-1 text-left text-sm outline-none ring-1 ring-ring/60 ring-inset placeholder:text-muted-foreground/60"
     />
   );
 }
