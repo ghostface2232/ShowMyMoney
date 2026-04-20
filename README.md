@@ -43,7 +43,3 @@ Deployed on Vercel. Connect the GitHub repo, set the same three env vars (`SUPAB
 - Recharts for growth charts
 - Motion for animations
 - Serwist for PWA / service worker
-
-## License
-
-MIT
