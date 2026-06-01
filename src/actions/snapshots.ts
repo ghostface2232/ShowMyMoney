@@ -1,4 +1,4 @@
-// 스냅샷(월별 자산 기록) CRUD 서버 액션. year_month 유니크 제약과 소유권 검증을 강제한다.
+// Snapshot (monthly asset record) CRUD server actions. Enforces the year_month unique constraint and ownership checks.
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -55,8 +55,43 @@ export async function createSnapshot(
     return { ok: false, error: "스냅샷 생성에 실패했습니다." };
   }
 
+  const snapshot = data as Snapshot;
+  await copyEntriesFromPreviousMonth(supabase, accountId, snapshot);
+
   revalidatePath("/");
-  return { ok: true, snapshot: data as Snapshot };
+  return { ok: true, snapshot };
+}
+
+// New months start as a copy of the most recent earlier month so the user
+// only edits what changed. Falls back to an empty snapshot if none exists.
+async function copyEntriesFromPreviousMonth(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  accountId: string,
+  snapshot: Snapshot,
+): Promise<void> {
+  const { data: previous } = await supabase
+    .from("snapshots")
+    .select("id")
+    .eq("account_id", accountId)
+    .lt("year_month", snapshot.year_month)
+    .order("year_month", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!previous) return;
+
+  const { data: entries } = await supabase
+    .from("entries")
+    .select("category_id, amount")
+    .eq("snapshot_id", previous.id);
+  if (!entries || entries.length === 0) return;
+
+  await supabase.from("entries").insert(
+    entries.map((entry) => ({
+      snapshot_id: snapshot.id,
+      category_id: entry.category_id,
+      amount: entry.amount,
+    })),
+  );
 }
 
 export async function deleteSnapshot(snapshotId: string): Promise<Result> {
