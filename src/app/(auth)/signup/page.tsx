@@ -1,4 +1,4 @@
-// 신규 계정 생성 화면. 표시 이름과 PIN, PIN 재확인을 받아 계정과 기본 카테고리를 만든다.
+// New account creation screen. Takes display name, PIN, and PIN confirmation to create the account and default categories.
 "use client";
 
 import Link from "next/link";

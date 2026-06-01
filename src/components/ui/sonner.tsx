@@ -1,4 +1,4 @@
-// 앱 테마 토큰과 맞춘 Sonner 토스트 래퍼.
+// Sonner toast wrapper aligned with the app's theme tokens.
 "use client"
 
 import { Toaster as Sonner, type ToasterProps } from "sonner"

@@ -1,4 +1,4 @@
-// DB 테이블과 1:1 대응하는 공유 TypeScript 타입. uuid는 string, 시간은 ISO string.
+// Shared TypeScript types mapping 1:1 to DB tables. uuid as string, timestamps as ISO string.
 
 export type Account = {
   id: string;

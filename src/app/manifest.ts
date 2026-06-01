@@ -1,4 +1,4 @@
-// PWA Web App Manifest. ShowMyMoney의 설치 메타 정보 (이름, 아이콘, 테마 색)를 정의한다.
+// PWA Web App Manifest. Defines ShowMyMoney's install metadata (name, icons, theme color).
 import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {

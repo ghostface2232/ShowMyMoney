@@ -1,4 +1,4 @@
-// 엔트리(스냅샷 × 카테고리의 금액) 서버 액션. 유니크 제약 기반 upsert로 금액을 기록한다.
+// Entry (amount per snapshot x category) server actions. Records amounts via unique-constraint-based upsert.
 "use server";
 
 import { revalidatePath } from "next/cache";

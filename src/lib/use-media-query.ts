@@ -1,4 +1,4 @@
-// window.matchMedia 결과를 useSyncExternalStore로 구독한다. SSR 스냅샷은 false.
+// Subscribes to window.matchMedia results via useSyncExternalStore. SSR snapshot is false.
 
 import { useCallback, useSyncExternalStore } from "react";
 

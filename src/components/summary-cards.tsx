@@ -1,4 +1,4 @@
-// 헤더 아래의 요약 스트립. 어떤 카드를 탭하든 동일한 Dialog가 열려 그룹별 월별 증식량을 한 그래프에서 컬러로 구분해 보여준다.
+// Summary strip below the header. Tapping any card opens the same Dialog, showing per-group monthly growth color-coded on a single graph.
 "use client";
 
 import { useMemo, useState } from "react";

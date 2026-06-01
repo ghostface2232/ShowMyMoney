@@ -1,4 +1,4 @@
-// 카테고리 그룹/항목의 CRUD 및 재정렬 서버 액션. 모든 진입점에서 requireAccount와 소유권 검증을 수행한다.
+// Server actions for CRUD and reordering of category groups/items. Every entry point runs requireAccount and ownership checks.
 "use server";
 
 import { revalidatePath } from "next/cache";

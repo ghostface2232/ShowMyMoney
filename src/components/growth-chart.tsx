@@ -1,4 +1,4 @@
-// 월별 증식량을 그룹별 컬러로 구분해 한 그래프에 표시하는 grouped BarChart. 부모 컨테이너 폭에 맞춰 반응형으로 렌더하고, 자산 테이블과 같은 방향으로 최근 달이 왼쪽에 오도록 데이터 순서를 뒤집는다.
+// Grouped BarChart showing monthly growth in one graph, color-coded by group. Renders responsively to the parent container width and reverses the data order so the most recent month is on the left, matching the asset table.
 "use client";
 
 import { useMemo } from "react";

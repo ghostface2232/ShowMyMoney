@@ -1,4 +1,4 @@
-// 월별 자산 테이블. 그룹별 항목 관리 모달과 금액 입력을 한 화면에서 수행한다.
+// Monthly asset table. Manages per-group items via a modal and amount entry on a single screen.
 "use client";
 
 import {
@@ -102,9 +102,9 @@ export function AssetTable({ dashboard }: Props) {
   const localDashboardRef = useRef(dashboard);
   const serverDashboardRef = useRef(dashboard);
   const pendingBackgroundCountRef = useRef(0);
-  // 동일 셀의 연속 변경 시 어느 응답이 최신인지 판별. 응답이 stale이면 UI에 반영하지 않는다.
+  // Tracks which response is newest for consecutive edits to the same cell. Stale responses are not applied to the UI.
   const cellGenerationRef = useRef(new Map<string, number>());
-  // 낙관적 엔트리가 서버에 반영되기 전에 삭제된 경우, 서버 ID가 확인되는 즉시 정리하도록 표시한다.
+  // Marks an optimistic entry deleted before the server confirmed it, so it is cleaned up as soon as the server ID is known.
   const cellDeletionPendingRef = useRef(new Set<string>());
 
   const reducedMotion = useReducedMotion();
@@ -1034,8 +1034,8 @@ function SnapshotColumn({
     return total;
   }, [snapshot.entriesByCategory, categories]);
 
-  // 너비는 duration 기반 ease-out으로 정착시켜 스프링 특유의 미세한 바운스를 피한다.
-  // 사이드로 밀려나는 형제 열은 `layout`이 transform 기반 FLIP으로 처리해 GPU 가속을 유지한다.
+  // Settle width with a duration-based ease-out to avoid the subtle bounce of a spring.
+  // Sibling columns pushed aside are handled by `layout` via transform-based FLIP to keep GPU acceleration.
   const sizeTransition =
     "duration" in transition
       ? transition

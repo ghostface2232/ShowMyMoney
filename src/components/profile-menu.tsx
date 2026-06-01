@@ -1,4 +1,4 @@
-// 헤더 좌측 아바타. 클릭 시 프로필 설정 Dialog(표시 이름/PIN 변경/로그아웃/계정 삭제)를 연다.
+// Header-left avatar. On click, opens the profile settings Dialog (display name / change PIN / sign out / delete account).
 "use client";
 
 import { useState, useTransition } from "react";

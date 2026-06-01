@@ -1,4 +1,4 @@
-// 요약 카드 탭 시 열리는 그룹별 월별 증식량 Dialog. 데스크톱은 중앙 Dialog, 모바일은 하단 Sheet로 전환한다.
+// Per-group monthly growth Dialog opened by tapping the summary card. Renders as a centered Dialog on desktop and a bottom Sheet on mobile.
 "use client";
 
 import {

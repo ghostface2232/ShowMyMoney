@@ -1,4 +1,4 @@
-// PIN 로그인 화면. 단일 숫자 필드와 인라인 에러 메시지로 계정에 진입한다.
+// PIN login screen. Enters the account via a single numeric field with inline error messages.
 "use client";
 
 import Link from "next/link";

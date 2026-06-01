@@ -1,4 +1,4 @@
-// 루트 레이아웃. 전역 폰트 변수, 모션 셸, sonner Toaster, PWA 메타데이터를 붙인다.
+// Root layout. Attaches global font variables, motion shell, sonner Toaster, and PWA metadata.
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 

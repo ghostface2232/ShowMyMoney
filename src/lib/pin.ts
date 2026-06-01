@@ -1,4 +1,4 @@
-// PIN 해시/검증 및 유효성 검사 유틸. bcryptjs 10 rounds, 숫자만 6~12자리.
+// PIN hashing/verification and validation utils. bcryptjs 10 rounds, digits only, 6~12 characters.
 import bcrypt from "bcryptjs";
 
 const BCRYPT_ROUNDS = 10;

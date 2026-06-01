@@ -1,4 +1,4 @@
-// 루트 레이아웃 아래에서 pathname 변화를 감지해 content를 fade + slight y offset으로 전환하는 얇은 래퍼.
+// Thin wrapper under the root layout that detects pathname changes and transitions content with a fade + slight y offset.
 "use client";
 
 import { usePathname } from "next/navigation";

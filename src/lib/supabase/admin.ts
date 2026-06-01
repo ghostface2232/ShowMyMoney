@@ -1,4 +1,4 @@
-// 서버 전용 Supabase admin 클라이언트. service_role 키로 DB에 접근하는 싱글톤을 제공한다.
+// Server-only Supabase admin client. Provides a singleton that accesses the DB with the service_role key.
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 

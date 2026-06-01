@@ -1,4 +1,4 @@
-// 목표 분석 Dialog. 상단에 현재 총자산을 크게 표시하고, 목표별로 달성률·필요 월 저축액·상태를 보여준다. 인라인 폼으로 생성/수정하고 AlertDialog로 삭제 확인한다.
+// Goal analysis Dialog. Shows the current total assets prominently at the top, and per-goal progress, required monthly savings, and status. Creates/edits via an inline form and confirms deletion with an AlertDialog.
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
@@ -69,7 +69,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<
     { id: string; label: string } | null
   >(null);
-  // 레이아웃 애니메이션 도중 overflow-y-auto가 일시적으로 스크롤바를 띄우는 걸 막기 위한 가드.
+  // Guard to prevent overflow-y-auto from briefly showing a scrollbar during the layout animation.
   const [isAnimating, setIsAnimating] = useState(false);
 
   const today = useMemo(() => new Date(), []);

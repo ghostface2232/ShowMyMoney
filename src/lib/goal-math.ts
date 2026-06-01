@@ -1,11 +1,11 @@
-// 목표 분석 계산 로직. 순수 함수만 포함하여 테스트와 재사용이 쉽게 한다.
+// Goal analysis calculations. Pure functions only, for easy testing and reuse.
 
 export type GoalStatus = "reached" | "overdue" | "on-track";
 
 /**
- * 지금부터 목표일까지 남은 개월 수(현재 달 포함, 부분 월은 올림). 최소 1을 반환한다.
- * 예) today=2026-04-19, targetDate=2026-12-31 → 9
- *     today=2026-04-19, targetDate=2026-04-30 → 1
+ * Months remaining from now until the target date (includes the current month, rounds up partial months). Returns at least 1.
+ * e.g. today=2026-04-19, targetDate=2026-12-31 → 9
+ *      today=2026-04-19, targetDate=2026-04-30 → 1
  */
 export function monthsUntil(
   targetDate: string,
@@ -20,7 +20,7 @@ export function monthsUntil(
 }
 
 /**
- * 목표까지 매월 추가로 적립해야 하는 금액. 이미 달성한 상태(결과 <= 0)면 호출측에서 표기를 생략한다.
+ * Amount that must be saved each month to reach the goal. If already reached (result <= 0), the caller omits the display.
  */
 export function requiredMonthlySavings(
   targetAmount: number,
@@ -32,7 +32,7 @@ export function requiredMonthlySavings(
 }
 
 /**
- * 달성률. 0~100으로 clamp한다. 목표 금액이 0 이하면 0을 반환.
+ * Progress percentage. Clamped to 0~100. Returns 0 if the target amount is 0 or less.
  */
 export function progressPct(
   currentTotal: number,
@@ -46,7 +46,7 @@ export function progressPct(
 }
 
 /**
- * 목표 상태. 달성했으면 reached, 목표일이 지났는데 미달성이면 overdue, 그 외 on-track.
+ * Goal status. reached if achieved, overdue if the target date passed without achieving it, otherwise on-track.
  */
 export function statusOf(
   targetAmount: number,

@@ -1,4 +1,4 @@
-// 숫자 카운트 애니메이션. requestAnimationFrame 기반으로 300~500ms 동안 큐빅 ease-out으로 이전 값에서 새 값으로 이어간다.
+// Number count-up animation. Uses requestAnimationFrame to transition from the previous value to the new value over 300-500ms with a cubic ease-out.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -21,16 +21,16 @@ export function CountUp({
 }: Props) {
   const reducedMotion = useReducedMotion();
   const [animatedValue, setAnimatedValue] = useState(value);
-  // 현재 화면에 보이는 값. 애니메이션이 중간에 끊기고 새 값이 들어와도 끊김 없이 이어가기 위해 매 프레임 갱신한다.
+  // The value currently shown on screen. Updated every frame so the animation continues seamlessly even when interrupted by a new value.
   const currentRef = useRef(value);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (reducedMotion) {
-      // 모션 끄기 상태에서는 rAF를 돌리지 않고 즉시 동기화한다.
-      // animatedValue까지 맞춰 두지 않으면 사용자가 reducedMotion을 해제한 직후
-      // 다음 값 변경 전까지 stale한 수치가 그대로 보인다. 같은 값을 setState하면
-      // React가 bail-out해서 cascading render는 일어나지 않는다.
+      // When motion is disabled, sync immediately instead of running rAF.
+      // If animatedValue isn't kept in sync, a stale number would remain visible right after
+      // the user turns off reducedMotion until the next value change. Calling setState with the
+      // same value lets React bail out, so no cascading render occurs.
       currentRef.current = value;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setAnimatedValue(value);

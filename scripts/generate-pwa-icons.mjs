@@ -1,5 +1,5 @@
-// 임시 PWA 아이콘 생성기. 단색 배경 + "SMM" 이니셜 PNG를 public/icons에 저장한다.
-// 향후 실제 브랜드 아이콘으로 교체할 것.
+// Temporary PWA icon generator. Saves a solid-background + "SMM" initials PNG to public/icons.
+// To be replaced with the real brand icon later.
 import { writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { dirname, resolve } from "node:path";

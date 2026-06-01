@@ -1,4 +1,4 @@
-// PIN 기반 인증 서버 액션. 세션 쿠키에 accountId/displayName을 기록한다.
+// PIN-based authentication server actions. Records accountId/displayName in the session cookie.
 "use server";
 
 import { redirect } from "next/navigation";

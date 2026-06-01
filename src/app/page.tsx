@@ -1,4 +1,4 @@
-// 홈 대시보드 진입점. 세션 검증 후 대시보드 데이터와 목표·프로필 메타를 SSR로 받아 헤더/요약/테이블에 주입한다.
+// Home dashboard entry. After session validation, fetches dashboard data and goal/profile metadata via SSR and injects them into the header/summary/table.
 import { redirect } from "next/navigation";
 
 import { getDashboardData } from "@/actions/dashboard";

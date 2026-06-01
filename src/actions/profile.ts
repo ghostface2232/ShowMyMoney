@@ -1,4 +1,4 @@
-// 프로필(계정) 관리 서버 액션. 표시 이름/PIN 변경, 계정 삭제를 처리하며 PIN 관련 실패에는 타이밍 공격 완화 지연을 적용한다.
+// Profile (account) management server actions. Handles display name/PIN changes and account deletion, applying a timing-attack mitigation delay on PIN-related failures.
 "use server";
 
 import { requireAccount } from "@/lib/auth-guard";

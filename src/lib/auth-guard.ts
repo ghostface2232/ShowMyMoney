@@ -1,4 +1,4 @@
-// 서버 액션/Route Handler용 세션 가드. 유효한 세션에서 accountId를 꺼내 반환한다.
+// Session guard for server actions/Route Handlers. Extracts accountId from a valid session.
 import "server-only";
 import { getSession } from "@/lib/session";
 

@@ -1,8 +1,8 @@
-// Serwist 기반 서비스 워커 엔트리.
-// 보안 주의: 이 앱은 PIN 기반 계정이 쿠키로만 식별되고 URL은 계정별로 분기되지 않는다.
-// 따라서 HTML/RSC/API 응답을 URL 키로 캐시하면 공유 기기에서 다른 계정 사용자가
-// 이전 사용자의 자산 데이터를 오프라인/네트워크 타임아웃 시 보게 될 수 있다.
-// defaultCache 대신 정적 자산만 캐시하고, 인증된 동일 출처 요청은 모두 NetworkOnly로 처리한다.
+// Serwist-based service worker entry.
+// Security note: this app identifies PIN-based accounts only via cookies, and URLs are not branched per account.
+// So caching HTML/RSC/API responses by URL key could let another account's user on a shared device
+// see the previous user's asset data when offline or on network timeout.
+// Instead of defaultCache, cache only static assets and handle all authenticated same-origin requests as NetworkOnly.
 import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist";
 import {
   CacheFirst,
@@ -125,7 +125,7 @@ const runtimeCaching: RuntimeCaching[] = [
       ],
     }),
   },
-  // 인증된/계정별 응답은 절대 캐시하지 않는다 (HTML 문서, RSC 페이로드, 모든 /api/* GET, 그 외 동일 출처).
+  // Never cache authenticated/per-account responses (HTML documents, RSC payloads, all /api/* GETs, and other same-origin requests).
   {
     matcher: ({ request }) => request.destination === "document",
     handler: new NetworkOnly(),
@@ -149,9 +149,9 @@ const runtimeCaching: RuntimeCaching[] = [
   },
 ];
 
-// 사용자 정의 캐시 이름 화이트리스트. 활성화 시점에 그 외의 런타임 캐시(이전 버전의 `pages`,
-// `pages-rsc`, `apis`, `others`, `next-data` 등)가 있다면 계정 간 유출 가능성이 있으므로 모두 제거한다.
-// precache-* 버킷은 Serwist가 직접 관리하므로 건드리지 않는다.
+// Whitelist of custom cache names. On activation, remove any other runtime caches (older versions like `pages`,
+// `pages-rsc`, `apis`, `others`, `next-data`, etc.) since they risk cross-account leakage.
+// The precache-* buckets are managed directly by Serwist, so leave them untouched.
 const SAFE_RUNTIME_CACHES = new Set([
   "google-fonts-webfonts",
   "google-fonts-stylesheets",

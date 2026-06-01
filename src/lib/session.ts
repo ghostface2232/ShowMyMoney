@@ -1,4 +1,4 @@
-// iron-session 기반 서버 세션 헬퍼. 쿠키 showmymoney_session에 accountId/displayName만 담는다.
+// iron-session-based server session helper. Stores only accountId/displayName in the showmymoney_session cookie.
 import "server-only";
 import { cookies } from "next/headers";
 import { getIronSession, type SessionOptions } from "iron-session";

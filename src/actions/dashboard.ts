@@ -1,5 +1,5 @@
-// 대시보드 초기 렌더에 필요한 데이터를 한 번에 수집하는 서버 액션.
-// 카테고리 트리와 스냅샷(+엔트리)을 동시에 가져와 테이블 렌더에 최적화된 형태로 반환한다.
+// Server action that collects all data needed for the dashboard's initial render in one call.
+// Fetches the category tree and snapshots (+entries) concurrently and returns them in a table-render-optimized shape.
 "use server";
 
 import {

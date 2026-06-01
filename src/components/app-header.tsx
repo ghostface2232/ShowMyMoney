@@ -1,4 +1,4 @@
-// 대시보드 최상단 헤더. 좌측 프로필 메뉴, 우측 글로벌 액션(달 관리 / 목표 분석).
+// Top dashboard header. Profile menu on the left, global actions (month management / goal analysis) on the right.
 import { GoalDialog } from "@/components/goal-dialog";
 import { MonthManagementButton } from "@/components/month-management-button";
 import { ProfileMenu } from "@/components/profile-menu";

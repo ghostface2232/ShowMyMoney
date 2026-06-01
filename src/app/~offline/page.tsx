@@ -1,4 +1,4 @@
-// 오프라인 폴백 페이지. 서비스 워커가 네트워크 실패 시 document destination 요청에 대해 이 페이지를 반환한다.
+// Offline fallback page. The service worker returns this page for document destination requests when the network fails.
 "use client";
 
 import { Button } from "@/components/ui/button";

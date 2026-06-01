@@ -1,4 +1,4 @@
-// 인증 페이지 전용 레이아웃. 헤더 없이 뷰포트 중앙에 카드를 띄운다.
+// Auth-only layout. Centers a card in the viewport with no header.
 import type { ReactNode } from "react";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {

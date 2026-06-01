@@ -1,4 +1,4 @@
-// 헤더 우측의 "달 관리" 트리거. 신규 월은 추가하고 기존 월은 삭제 확인을 연다.
+// Header-right "month management" trigger. Adds new months and opens delete confirmation for existing ones.
 "use client";
 
 import { useMemo, useState, useTransition } from "react";

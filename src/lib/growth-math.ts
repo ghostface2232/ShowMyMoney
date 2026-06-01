@@ -1,4 +1,4 @@
-// 월별 증식량을 그룹별 다중 시리즈로 계산한다. 인접한 스냅샷의 엔트리 합 차이를 각 그룹에 대해 산출한다.
+// Computes monthly growth as multiple series per group. For each group, derives the difference in entry sums between adjacent snapshots.
 
 import type { CategoryGroupWithCategories } from "@/actions/categories";
 import type { SnapshotWithEntries } from "@/actions/dashboard";

@@ -1,4 +1,4 @@
-// 년-월을 선택하는 미니 팝오버. 이미 존재하는 year_month는 비활성화한다.
+// Mini popover for picking a year-month. Disables already-existing year_month values.
 "use client";
 
 import { useState, type ReactNode } from "react";

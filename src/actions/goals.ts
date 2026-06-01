@@ -1,4 +1,4 @@
-// 목표(저축 목표) CRUD 서버 액션. 소유권 검증과 입력 유효성 검사를 수행한다.
+// Goal (savings goal) CRUD server actions. Performs ownership checks and input validation.
 "use server";
 
 import { revalidatePath } from "next/cache";

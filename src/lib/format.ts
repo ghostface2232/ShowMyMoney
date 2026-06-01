@@ -1,4 +1,4 @@
-// UI 전반에서 사용하는 통화/년월 포맷 헬퍼. ko-KR KRW 표기와 "26_3월" 형식을 제공.
+// Currency/year-month format helpers used across the UI. Provides ko-KR KRW notation and "26_3월" format.
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR", {
   style: "currency",
@@ -17,7 +17,7 @@ export function formatYearMonth(yearMonth: number): string {
   return `${yy}_${month}월`;
 }
 
-// 차트 축 등 좁은 공간에 쓰는 통화 단축 표기. 만/억 단위로 압축하며 원 단위는 생략한다.
+// Compact currency notation for tight spaces like chart axes. Compresses into man/eok (10K/100M) units and omits the won unit.
 export function formatKRWCompact(amount: number): string {
   const abs = Math.abs(amount);
   if (abs < 10_000) return String(Math.round(amount));
