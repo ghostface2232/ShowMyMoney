@@ -1,9 +1,9 @@
-// Root layout. Attaches global font variables, motion shell, sonner Toaster, and PWA metadata.
+// Root layout. Attaches global font variables, the bottom tab bar, sonner Toaster, and PWA metadata.
+// Route transitions live in the (app) group layout so the shared header persists across tabs.
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 
 import "./globals.css";
-import { MotionShell } from "@/components/motion-shell";
 import { TabBar } from "@/components/tab-bar";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -55,7 +55,7 @@ export default function RootLayout({
       style={{ colorScheme: "light" }}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
-        <MotionShell>{children}</MotionShell>
+        {children}
         <TabBar />
         <Toaster />
       </body>

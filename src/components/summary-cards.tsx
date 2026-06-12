@@ -9,6 +9,7 @@ import type { DashboardData, SnapshotWithEntries } from "@/actions/dashboard";
 import { CountUp } from "@/components/count-up";
 import { Card } from "@/components/ui/card";
 import { GrowthDialog } from "@/components/growth-dialog";
+import { hasClientNavigated } from "@/lib/app-navigation";
 import { formatKRW } from "@/lib/format";
 import { calcMultiGrowthSeries } from "@/lib/growth-math";
 import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
@@ -66,7 +67,12 @@ export function SummaryCards({ dashboard }: Props) {
               key={card.key}
               type="button"
               onClick={() => setOpen(true)}
-              initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+              // Entry stagger only on initial load/refresh, not when remounting on a tab switch.
+              initial={
+                reducedMotion || hasClientNavigated()
+                  ? false
+                  : { opacity: 0, y: 8 }
+              }
               animate={{ opacity: 1, y: 0 }}
               transition={
                 reducedMotion

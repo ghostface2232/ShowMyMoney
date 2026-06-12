@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { Card } from "@/components/ui/card";
+import { hasClientNavigated } from "@/lib/app-navigation";
 import { formatKRW } from "@/lib/format";
 import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
 import type { Expense, ExpenseCategory } from "@/types/db";
@@ -68,7 +69,12 @@ export function ExpenseCategoryBreakdown({
                     backgroundColor: `var(--${BAR_COLORS[index % BAR_COLORS.length]})`,
                     willChange: "width",
                   }}
-                  initial={reducedMotion ? false : { width: 0 }}
+                  // Bar growth only on initial load/refresh, not when remounting on a tab switch.
+                  initial={
+                    reducedMotion || hasClientNavigated()
+                      ? false
+                      : { width: 0 }
+                  }
                   animate={{ width: `${widthPct}%` }}
                   transition={
                     reducedMotion

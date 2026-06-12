@@ -38,7 +38,7 @@ export function TabBar() {
     >
       {/* Translucent glass: low-alpha fill + heavy backdrop blur/saturation so content
           scrolling underneath stays visible through the bar (iOS tab bar feel). */}
-      <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-background/50 p-2 shadow-lg shadow-black/10 backdrop-blur-2xl backdrop-saturate-150">
+      <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-background/30 p-2 shadow-lg shadow-black/10 backdrop-blur-xl backdrop-saturate-150">
         {TABS.map((tab) => {
           const active =
             tab.href === "/"

@@ -8,6 +8,7 @@ import { motion, useReducedMotion } from "motion/react";
 import type { ExpenseScopeTotals } from "@/actions/expense-dashboard";
 import { CountUp } from "@/components/count-up";
 import { Card } from "@/components/ui/card";
+import { hasClientNavigated } from "@/lib/app-navigation";
 import { SCOPE_ALL, SCOPE_SHARED } from "@/lib/expense-scope";
 import { formatKRW } from "@/lib/format";
 import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
@@ -71,7 +72,12 @@ export function ExpenseSummaryCards({
                 onScopeChange(selected ? SCOPE_ALL : card.key)
               }
               aria-pressed={selected}
-              initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+              // Entry stagger only on initial load/refresh, not when remounting on a tab switch.
+              initial={
+                reducedMotion || hasClientNavigated()
+                  ? false
+                  : { opacity: 0, y: 8 }
+              }
               animate={{ opacity: 1, y: 0 }}
               transition={
                 reducedMotion
