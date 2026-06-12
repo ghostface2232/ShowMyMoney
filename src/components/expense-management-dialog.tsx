@@ -107,9 +107,13 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-w-26 justify-start gap-2.5 border-transparent bg-white text-foreground hover:bg-white/70 aria-expanded:bg-white/70"
+          >
             <Settings2 className="size-4" />
-            관리
+            지출 관리
           </Button>
         </DialogTrigger>
         <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-lg">
