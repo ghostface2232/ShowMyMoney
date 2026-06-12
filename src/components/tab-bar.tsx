@@ -47,6 +47,9 @@ export function TabBar() {
             <Link
               key={tab.href}
               href={tab.href}
+              // Full prefetch (data included, not just the loading boundary) so the
+              // other tab is already in the router cache before the first switch.
+              prefetch={true}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "relative flex items-center gap-2 rounded-full px-7 py-3.5 text-base font-medium transition-colors",
