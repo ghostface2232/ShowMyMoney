@@ -1,10 +1,18 @@
-// Per-pathname window scroll positions, so tab switches restore each tab's own
-// scroll offset like a native app instead of resetting to the top.
+// Per-pathname scroll positions of the app scroll container, so tab switches restore
+// each tab's own offset like a native app instead of resetting to the top. The document
+// never scrolls (see the root layout); all scrolling happens in this container.
+
+export const SCROLL_CONTAINER_ID = "app-scroll";
 
 const positions = new Map<string, number>();
 
+export function getScrollContainer(): HTMLElement | null {
+  return document.getElementById(SCROLL_CONTAINER_ID);
+}
+
 export function saveScrollPosition(pathname: string): void {
-  positions.set(pathname, window.scrollY);
+  const container = getScrollContainer();
+  if (container) positions.set(pathname, container.scrollTop);
 }
 
 export function getScrollPosition(pathname: string): number {

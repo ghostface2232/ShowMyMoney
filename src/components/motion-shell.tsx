@@ -9,7 +9,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { markClientNavigation } from "@/lib/app-navigation";
 import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
-import { getScrollPosition } from "@/lib/scroll-memory";
+import { getScrollContainer, getScrollPosition } from "@/lib/scroll-memory";
 
 // useLayoutEffect warns during SSR; the effect only matters in the browser anyway.
 const useIsomorphicLayoutEffect =
@@ -58,7 +58,7 @@ export function MotionShell({ children }: Props) {
   // Tab links navigate with scroll={false}; restore the target tab's own scroll
   // offset before paint so the switch keeps each tab's position like a native app.
   useIsomorphicLayoutEffect(() => {
-    window.scrollTo(0, getScrollPosition(pathname));
+    getScrollContainer()?.scrollTo(0, getScrollPosition(pathname));
   }, [pathname]);
 
   return (
