@@ -17,7 +17,7 @@ import { ExpenseSummaryCards } from "@/components/expense-summary-cards";
 import { Button } from "@/components/ui/button";
 import { YearMonthPicker } from "@/components/year-month-picker";
 import { SCOPE_ALL, SCOPE_SHARED } from "@/lib/expense-scope";
-import { formatYearMonth } from "@/lib/format";
+import { formatYearMonthLong } from "@/lib/format";
 import {
   currentYearMonth,
   firstDayOf,
@@ -113,7 +113,7 @@ export function ExpenseView({ dashboard }: Props) {
 
   const emptyMessage =
     dashboard.expenses.length === 0
-      ? `아직 ${formatYearMonth(dashboard.yearMonth)} 지출이 없습니다. 아래에서 첫 지출을 추가해 보세요.`
+      ? `아직 ${formatYearMonthLong(dashboard.yearMonth)} 지출이 없습니다. 아래에서 첫 지출을 추가해 보세요.`
       : `${scopeLabel} 범위의 지출이 없습니다.`;
 
   return (
@@ -142,7 +142,7 @@ export function ExpenseView({ dashboard }: Props) {
                 disabled={pending}
                 className="px-2 font-heading text-xl font-semibold"
               >
-                {formatYearMonth(dashboard.yearMonth)}
+                {formatYearMonthLong(dashboard.yearMonth)}
               </Button>
             }
           />

@@ -7,6 +7,7 @@ import { getProfile } from "@/actions/profile";
 import { AppHeader } from "@/components/app-header";
 import { AssetTable } from "@/components/asset-table";
 import { SummaryCards } from "@/components/summary-cards";
+import { TabBar } from "@/components/tab-bar";
 import { getSession } from "@/lib/session";
 
 export default async function HomePage() {
@@ -43,10 +44,11 @@ export default async function HomePage() {
         currentTotalAssets={currentTotalAssets}
         hasSnapshot={hasSnapshot}
       />
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-3 pb-6 md:px-8">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-3 pb-24 md:px-8">
         <SummaryCards dashboard={dashboard} />
         <AssetTable dashboard={dashboard} />
       </main>
+      <TabBar />
     </>
   );
 }
