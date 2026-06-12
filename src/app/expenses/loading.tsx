@@ -11,7 +11,7 @@ export default function ExpensesLoading() {
           <div className="h-8 w-20 animate-pulse rounded-lg bg-muted" />
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-3 pb-24 md:px-8">
+      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-3 pb-28 md:px-8">
         <div className="flex items-center justify-between">
           <div className="h-8 w-40 animate-pulse rounded-md bg-muted" />
           <div className="h-4 w-10 animate-pulse rounded-md bg-muted" />

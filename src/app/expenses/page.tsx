@@ -35,7 +35,7 @@ export default async function ExpensesPage({ searchParams }: Props) {
         members={dashboard.members}
         categories={dashboard.categories}
       />
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-3 pb-24 md:px-8">
+      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-3 pb-28 md:px-8">
         <ExpenseView dashboard={dashboard} />
       </main>
     </>

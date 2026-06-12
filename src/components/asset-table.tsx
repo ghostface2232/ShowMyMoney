@@ -611,11 +611,17 @@ function NameColumn({ categories }: NameColumnProps) {
       <div className="flex h-11 min-w-0 items-center text-sm font-medium">
         <span className="block min-w-0 truncate px-1">합계</span>
       </div>
-      {/* to-card/0 (same hue, zero alpha) instead of to-transparent: some browsers interpolate
-          transparent as rgba(0,0,0,0), tinting the fade gray midway. */}
+      {/* The transparent stop must be the SAME color with zero alpha. Both `transparent` and
+          Tailwind's `to-card/0` (color-mix toward transparent) compute to transparent BLACK,
+          which iOS Safari interpolates with straight alpha into a gray smear. Relative color
+          syntax derives "card at alpha 0"; unsupporting browsers drop the fade gracefully. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-full w-4 bg-gradient-to-r from-card to-card/0"
+        className="pointer-events-none absolute inset-y-0 left-full w-4"
+        style={{
+          background:
+            "linear-gradient(to right, var(--card), oklch(from var(--card) l c h / 0))",
+        }}
       />
     </div>
   );

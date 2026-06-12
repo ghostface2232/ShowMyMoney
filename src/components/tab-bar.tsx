@@ -36,7 +36,7 @@ export function TabBar() {
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 1rem)" }}
     >
-      <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-border/60 bg-background/75 p-1.5 shadow-lg shadow-black/10 backdrop-blur-xl">
+      <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border/60 bg-background/75 p-2 shadow-lg shadow-black/10 backdrop-blur-xl">
         {TABS.map((tab) => {
           const active =
             tab.href === "/"
@@ -49,7 +49,7 @@ export function TabBar() {
               href={tab.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-medium transition-colors",
+                "relative flex items-center gap-2 rounded-full px-7 py-3.5 text-base font-medium transition-colors",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 active
                   ? "text-primary-foreground"
@@ -65,7 +65,7 @@ export function TabBar() {
                   style={{ willChange: "transform" }}
                 />
               ) : null}
-              <Icon className="relative size-4.5" aria-hidden />
+              <Icon className="relative size-6" aria-hidden />
               <span className="relative">{tab.label}</span>
             </Link>
           );
