@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const outDir = resolve(__dirname, "..", "public", "icons");
 mkdirSync(outDir, { recursive: true });
 
-const BG = [0x4f, 0x46, 0xe5, 0xff]; // #4f46e5 (theme primary)
+const BG = [0x05, 0xaa, 0x5d, 0xff]; // #05AA5D (theme primary)
 const FG = [0xff, 0xff, 0xff, 0xff];
 
 const FONT = {
