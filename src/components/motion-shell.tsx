@@ -4,11 +4,16 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { markClientNavigation } from "@/lib/app-navigation";
 import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
+import { getScrollPosition } from "@/lib/scroll-memory";
+
+// useLayoutEffect warns during SSR; the effect only matters in the browser anyway.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type Props = { children: ReactNode };
 
@@ -49,6 +54,12 @@ export function MotionShell({ children }: Props) {
     });
   }
   const direction = tracked.direction;
+
+  // Tab links navigate with scroll={false}; restore the target tab's own scroll
+  // offset before paint so the switch keeps each tab's position like a native app.
+  useIsomorphicLayoutEffect(() => {
+    window.scrollTo(0, getScrollPosition(pathname));
+  }, [pathname]);
 
   return (
     <AnimatePresence mode="popLayout" initial={false} custom={direction}>

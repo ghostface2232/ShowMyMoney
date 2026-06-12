@@ -9,6 +9,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { ReceiptText, Wallet, type LucideIcon } from "lucide-react";
 
 import { SPRING_DEFAULT } from "@/lib/motion";
+import { saveScrollPosition } from "@/lib/scroll-memory";
 import { cn } from "@/lib/utils";
 
 type Tab = {
@@ -52,6 +53,10 @@ export function TabBar() {
               // Full prefetch (data included, not just the loading boundary) so the
               // other tab is already in the router cache before the first switch.
               prefetch={true}
+              // Scroll is handled by scroll-memory: each tab keeps its own offset
+              // instead of jumping to the top on every switch.
+              scroll={false}
+              onClick={() => saveScrollPosition(pathname)}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "relative flex items-center gap-2 rounded-full px-7 py-3.5 text-base font-medium transition-colors",
