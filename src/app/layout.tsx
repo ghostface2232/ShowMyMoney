@@ -6,6 +6,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { TabBar } from "@/components/tab-bar";
 import { Toaster } from "@/components/ui/sonner";
+import { SCROLL_CONTAINER_ID } from "@/lib/scroll-memory";
 
 const sfPro = localFont({
   src: [
@@ -54,8 +55,17 @@ export default function RootLayout({
       className={`${sfPro.variable} h-full antialiased`}
       style={{ colorScheme: "light" }}
     >
-      <body className="flex min-h-full flex-col bg-background text-foreground">
-        {children}
+      {/* App-shell scrolling: the document itself never scrolls — all scrolling happens
+          inside the container below. In Safari this keeps the toolbars from collapsing/
+          expanding on scroll, so the fixed tab bar never gets pushed around; in standalone
+          (home screen) mode the behavior is identical. */}
+      <body className="h-full overflow-hidden bg-background text-foreground">
+        <div
+          id={SCROLL_CONTAINER_ID}
+          className="flex h-full flex-col overflow-y-auto overscroll-none"
+        >
+          {children}
+        </div>
         <TabBar />
         <Toaster />
       </body>
