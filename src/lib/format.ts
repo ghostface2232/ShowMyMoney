@@ -17,6 +17,16 @@ export function formatYearMonth(yearMonth: number): string {
   return `${yy}_${month}월`;
 }
 
+// "YYYY-MM-DD" → "6월 12일 (목)". Day header label for the expense list.
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+
+export function formatDayLabel(spentOn: string): string {
+  const [year, month, day] = spentOn.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return spentOn;
+  return `${month}월 ${day}일 (${WEEKDAYS[date.getDay()]})`;
+}
+
 // Compact currency notation for tight spaces like chart axes. Compresses into man/eok (10K/100M) units and omits the won unit.
 export function formatKRWCompact(amount: number): string {
   const abs = Math.abs(amount);

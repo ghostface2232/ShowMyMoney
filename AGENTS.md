@@ -22,7 +22,7 @@ Design reference points: Notion database tables, Figma UI3, Claude web. The visu
 - `src/components` — reusable UI components
 - `src/components/ui` — shadcn/ui primitives (do not edit by hand; regenerate via CLI)
 - `src/lib` — server-side utilities: Supabase admin client, session helpers, PIN hashing, auth guards
-- `src/actions` — server actions grouped by domain (auth, categories, snapshots, entries, goals, profile, dashboard)
+- `src/actions` — server actions grouped by domain (auth, categories, snapshots, entries, goals, profile, dashboard, members, expense-categories, expenses, expense-dashboard)
 - `src/types` — shared TypeScript types mirroring the database schema
 - `src/styles` — `globals.css` with Tailwind v4 `@theme inline` configuration
 
@@ -39,6 +39,7 @@ Design reference points: Notion database tables, Figma UI3, Claude web. The visu
 ## UI Conventions
 
 - Page structure from top to bottom: sticky header → horizontal summary card strip → monthly asset table.
+- The app has two top-level routes switched via the header center NavTabs: `/` (assets) and `/expenses` (expenses). The expenses page loads one month at a time via the `?ym=` search param and follows the same structure: sticky header → month nav → summary card strip (total / per member / shared, tap to filter scope) → category breakdown → day-grouped transaction list with an inline composer. Expense delta badges invert the asset colors (spending increase = destructive).
 - The asset table orders snapshots with the most recent on the left.
 - Dark mode is supported end-to-end. The theme toggle sits at the top-right of the header.
 - Work with Luma's design tokens instead of overriding them. Borders lean toward rounded (`rounded-xl` and above for cards), shadows stay soft, spacing stays generous. Avoid sharp corners, heavy borders, or dense padding that would fight the preset.
@@ -62,7 +63,7 @@ Design reference points: Notion database tables, Figma UI3, Claude web. The visu
 
 ## Data Model
 
-Six tables, all scoped per account via `account_id`:
+Nine tables, all scoped per account via `account_id`:
 
 - `accounts` — id, pin_hash, display_name, first_used_at, updated_at
 - `category_groups` — id, account_id, name, sort_order, created_at
@@ -70,8 +71,15 @@ Six tables, all scoped per account via `account_id`:
 - `snapshots` — id, account_id, year_month, note, created_at; unique on (account_id, year_month)
 - `entries` — id, snapshot_id, category_id, amount, created_at, updated_at; unique on (snapshot_id, category_id)
 - `goals` — id, account_id, label, target_amount, target_date, created_at
+- `members` — id, account_id, name, color, sort_order, created_at; people sharing the account (e.g. a couple)
+- `expense_categories` — id, account_id, name, sort_order, created_at; flat, no groups
+- `expenses` — id, account_id, category_id (nullable), member_id (nullable), amount, spent_on, year_month, memo, created_at, updated_at
 
 `year_month` is a six-digit integer such as `202603` (March 2026) to keep sorting and comparison trivial.
+
+Assets are stock data (one upserted amount per snapshot × category); expenses are flow data (one row per transaction). Do not model expenses as monthly snapshots.
+
+Expense semantics: `member_id = null` means a shared (공용) expense; `category_id = null` means uncategorized (미분류). `expenses.year_month` is a stored generated column derived from `spent_on`. Deleting a member sets its expenses to shared (`on delete set null`); deleting an expense category leaves its expenses uncategorized. `members.color` holds a chart token name (`chart-1`…`chart-5`) rendered via `var(--chart-N)`.
 
 Cascading deletes are enabled. Deleting a group removes its categories and all related entries. Deleting an account removes everything.
 
@@ -97,6 +105,7 @@ RLS is enabled on every table with no policies. This blocks any access via the p
 
 - PIN sign-in scans all accounts with bcrypt compare. Acceptable at this scale; revisit with a PIN prefix index if the user base grows past a few dozen.
 - `getDashboardData` loads all snapshots in a single query. Paginate or lazy-load historical snapshots when the count climbs past roughly 24.
+- `getExpenseDashboardData` fetches all `year_month` values to build the months-with-data set (supabase-js has no distinct). Fine at personal-ledger scale; switch to an RPC once expense rows reach the thousands.
 - No offline write support. The service worker caches the app shell and shows an offline fallback page; data writes require network.
 - No realtime cross-device sync. Other devices pick up changes on reload. Supabase Realtime could be added later if needed.
 
