@@ -5,7 +5,6 @@ import { getExpenseDashboardData } from "@/actions/expense-dashboard";
 import { getProfile } from "@/actions/profile";
 import { ExpenseHeader } from "@/components/expense-header";
 import { ExpenseView } from "@/components/expense-view";
-import { TabBar } from "@/components/tab-bar";
 import { getSession } from "@/lib/session";
 import { currentYearMonth, isValidYearMonth } from "@/lib/year-month";
 
@@ -39,7 +38,6 @@ export default async function ExpensesPage({ searchParams }: Props) {
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-3 pb-24 md:px-8">
         <ExpenseView dashboard={dashboard} />
       </main>
-      <TabBar />
     </>
   );
 }

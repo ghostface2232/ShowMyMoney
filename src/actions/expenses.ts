@@ -6,8 +6,14 @@ import { revalidatePath } from "next/cache";
 import { requireAccount } from "@/lib/auth-guard";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isValidDateString } from "@/lib/year-month";
+import type { Expense } from "@/types/db";
 
-type Result = { ok: true } | { ok: false; error: string };
+type Result<T extends object = object> =
+  | ({ ok: true } & T)
+  | { ok: false; error: string };
+
+const EXPENSE_COLUMNS =
+  "id, account_id, category_id, member_id, amount, spent_on, year_month, memo, created_at, updated_at";
 
 export type ExpenseInput = {
   amount: number;
@@ -17,31 +23,37 @@ export type ExpenseInput = {
   memo?: string;
 };
 
-export async function createExpense(input: ExpenseInput): Promise<Result> {
+export async function createExpense(
+  input: ExpenseInput,
+): Promise<Result<{ expense: Expense }>> {
   const accountId = await requireAccount();
 
   const validated = await validateInput(accountId, input);
   if (!validated.ok) return validated;
 
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from("expenses").insert({
-    account_id: accountId,
-    category_id: input.categoryId,
-    member_id: input.memberId,
-    amount: input.amount,
-    spent_on: input.spentOn,
-    memo: normalizeMemo(input.memo),
-  });
+  const { data, error } = await supabase
+    .from("expenses")
+    .insert({
+      account_id: accountId,
+      category_id: input.categoryId,
+      member_id: input.memberId,
+      amount: input.amount,
+      spent_on: input.spentOn,
+      memo: normalizeMemo(input.memo),
+    })
+    .select(EXPENSE_COLUMNS)
+    .single();
   if (error) return { ok: false, error: "지출 저장에 실패했습니다." };
 
   revalidatePath("/expenses");
-  return { ok: true };
+  return { ok: true, expense: data as Expense };
 }
 
 export async function updateExpense(
   expenseId: string,
   input: ExpenseInput,
-): Promise<Result> {
+): Promise<Result<{ expense: Expense }>> {
   const accountId = await requireAccount();
 
   const validated = await validateInput(accountId, input);
@@ -52,7 +64,7 @@ export async function updateExpense(
     return { ok: false, error: "지출을 찾을 수 없습니다." };
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("expenses")
     .update({
       category_id: input.categoryId,
@@ -61,11 +73,13 @@ export async function updateExpense(
       spent_on: input.spentOn,
       memo: normalizeMemo(input.memo),
     })
-    .eq("id", expenseId);
+    .eq("id", expenseId)
+    .select(EXPENSE_COLUMNS)
+    .single();
   if (error) return { ok: false, error: "지출 수정에 실패했습니다." };
 
   revalidatePath("/expenses");
-  return { ok: true };
+  return { ok: true, expense: data as Expense };
 }
 
 export async function deleteExpense(expenseId: string): Promise<Result> {

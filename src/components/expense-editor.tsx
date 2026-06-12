@@ -1,4 +1,5 @@
 // Expense composer (continuous entry) and edit dialog sharing the same form fields.
+// Mutations are applied optimistically by the parent view, so submit handlers are synchronous.
 "use client";
 
 import { useRef, useState } from "react";
@@ -6,12 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { seedDefaultExpenseCategories } from "@/actions/expense-categories";
-import {
-  createExpense,
-  deleteExpense,
-  updateExpense,
-  type ExpenseInput,
-} from "@/actions/expenses";
+import type { ExpenseInput } from "@/actions/expenses";
 import type { RunExpenseAction } from "@/components/expense-view";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -54,8 +50,8 @@ type ComposerProps = {
   members: Member[];
   defaultMemberKey: string;
   defaultDate: string;
-  disabled: boolean;
   runAction: RunExpenseAction;
+  onCreate: (input: ExpenseInput) => void;
 };
 
 export function ExpenseComposer({
@@ -63,8 +59,8 @@ export function ExpenseComposer({
   members,
   defaultMemberKey,
   defaultDate,
-  disabled,
   runAction,
+  onCreate,
 }: ComposerProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -82,19 +78,17 @@ export function ExpenseComposer({
     setOpen(true);
   }
 
-  async function submit() {
+  function submit() {
     if (!draft) return;
     const input = draftToInput(draft);
     if (!input) return;
-    const ok = await runAction(() => createExpense(input));
-    if (!ok) return;
+    onCreate(input);
     // Keep the form open for batch receipt entry; clear only the amount and memo.
     setDraft({ ...draft, amountText: "", memo: "" });
     amountRef.current?.focus();
   }
 
-  const canSubmit =
-    draft !== null && draftToInput(draft) !== null && !disabled;
+  const canSubmit = draft !== null && draftToInput(draft) !== null;
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -116,7 +110,6 @@ export function ExpenseComposer({
               onChange={(patch) => setDraft({ ...draft, ...patch })}
               categories={categories}
               members={members}
-              disabled={disabled}
               runAction={runAction}
               amountRef={amountRef}
               onSubmit={submit}
@@ -126,7 +119,6 @@ export function ExpenseComposer({
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={disabled}
                 onClick={() => setOpen(false)}
               >
                 닫기
@@ -148,7 +140,6 @@ export function ExpenseComposer({
           key="trigger"
           type="button"
           onClick={expand}
-          disabled={disabled}
           initial={reducedMotion ? false : { opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
@@ -159,7 +150,7 @@ export function ExpenseComposer({
           }
           className={cn(
             "flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed py-3 text-sm text-muted-foreground transition-colors",
-            "hover:border-foreground/30 hover:text-foreground disabled:opacity-50",
+            "hover:border-foreground/30 hover:text-foreground",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
           )}
         >
@@ -175,8 +166,9 @@ type EditDialogProps = {
   expense: Expense | null;
   categories: ExpenseCategory[];
   members: Member[];
-  disabled: boolean;
   runAction: RunExpenseAction;
+  onSave: (input: ExpenseInput) => void;
+  onDelete: () => void;
   onClose: () => void;
 };
 
@@ -184,8 +176,9 @@ export function ExpenseEditDialog({
   expense,
   categories,
   members,
-  disabled,
   runAction,
+  onSave,
+  onDelete,
   onClose,
 }: EditDialogProps) {
   return (
@@ -208,8 +201,9 @@ export function ExpenseEditDialog({
             expense={expense}
             categories={categories}
             members={members}
-            disabled={disabled}
             runAction={runAction}
+            onSave={onSave}
+            onDelete={onDelete}
             onClose={onClose}
           />
         ) : null}
@@ -222,15 +216,17 @@ function ExpenseEditBody({
   expense,
   categories,
   members,
-  disabled,
   runAction,
+  onSave,
+  onDelete,
   onClose,
 }: {
   expense: Expense;
   categories: ExpenseCategory[];
   members: Member[];
-  disabled: boolean;
   runAction: RunExpenseAction;
+  onSave: (input: ExpenseInput) => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>({
@@ -241,19 +237,19 @@ function ExpenseEditBody({
     memo: expense.memo ?? "",
   });
 
-  async function save() {
+  function save() {
     const input = draftToInput(draft);
     if (!input) return;
-    const ok = await runAction(() => updateExpense(expense.id, input));
-    if (ok) onClose();
+    onSave(input);
+    onClose();
   }
 
-  async function remove() {
-    const ok = await runAction(() => deleteExpense(expense.id));
-    if (ok) onClose();
+  function remove() {
+    onDelete();
+    onClose();
   }
 
-  const canSave = draftToInput(draft) !== null && !disabled;
+  const canSave = draftToInput(draft) !== null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -262,7 +258,6 @@ function ExpenseEditBody({
         onChange={(patch) => setDraft({ ...draft, ...patch })}
         categories={categories}
         members={members}
-        disabled={disabled}
         runAction={runAction}
         onSubmit={save}
       />
@@ -271,7 +266,6 @@ function ExpenseEditBody({
           type="button"
           variant="ghost"
           size="sm"
-          disabled={disabled}
           onClick={remove}
           className="text-muted-foreground hover:text-destructive"
         >
@@ -279,13 +273,7 @@ function ExpenseEditBody({
           삭제
         </Button>
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={disabled}
-            onClick={onClose}
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             취소
           </Button>
           <Button type="button" size="sm" disabled={!canSave} onClick={save}>
@@ -302,7 +290,6 @@ function ExpenseFields({
   onChange,
   categories,
   members,
-  disabled,
   runAction,
   amountRef,
   onSubmit,
@@ -311,7 +298,6 @@ function ExpenseFields({
   onChange: (patch: Partial<Draft>) => void;
   categories: ExpenseCategory[];
   members: Member[];
-  disabled: boolean;
   runAction: RunExpenseAction;
   amountRef?: React.RefObject<HTMLInputElement | null>;
   onSubmit: () => void;
@@ -335,7 +321,6 @@ function ExpenseFields({
             }
           }}
           placeholder="금액 (원)"
-          disabled={disabled}
           maxLength={13}
           className="flex-1 text-right tabular-nums"
         />
@@ -343,7 +328,6 @@ function ExpenseFields({
           type="date"
           value={draft.spentOn}
           onChange={(event) => onChange({ spentOn: event.target.value })}
-          disabled={disabled}
           className="w-36 shrink-0"
         />
       </div>
@@ -355,7 +339,6 @@ function ExpenseFields({
               <Chip
                 key={category.id}
                 selected={draft.categoryId === category.id}
-                disabled={disabled}
                 onClick={() =>
                   onChange({
                     categoryId:
@@ -376,7 +359,6 @@ function ExpenseFields({
               type="button"
               variant="outline"
               size="sm"
-              disabled={disabled}
               onClick={() => runAction(() => seedDefaultExpenseCategories())}
             >
               <Plus className="size-4" />
@@ -390,7 +372,6 @@ function ExpenseFields({
         <div className="flex flex-wrap gap-1.5">
           <Chip
             selected={draft.memberKey === SCOPE_SHARED}
-            disabled={disabled}
             onClick={() => onChange({ memberKey: SCOPE_SHARED })}
           >
             공용
@@ -399,7 +380,6 @@ function ExpenseFields({
             <Chip
               key={member.id}
               selected={draft.memberKey === member.id}
-              disabled={disabled}
               onClick={() => onChange({ memberKey: member.id })}
             >
               <span
@@ -423,7 +403,6 @@ function ExpenseFields({
           }
         }}
         placeholder="메모 (선택)"
-        disabled={disabled}
         maxLength={80}
       />
     </div>
@@ -449,12 +428,10 @@ function FieldGroup({
 
 function Chip({
   selected,
-  disabled,
   onClick,
   children,
 }: {
   selected: boolean;
-  disabled: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -462,12 +439,10 @@ function Chip({
     <button
       type="button"
       aria-pressed={selected}
-      disabled={disabled}
       onClick={onClick}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-        "disabled:opacity-50",
         selected
           ? "border-transparent bg-primary text-primary-foreground"
           : "bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground",

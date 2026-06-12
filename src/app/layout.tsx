@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 
 import "./globals.css";
 import { MotionShell } from "@/components/motion-shell";
+import { TabBar } from "@/components/tab-bar";
 import { Toaster } from "@/components/ui/sonner";
 
 const sfPro = localFont({
@@ -55,6 +56,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
         <MotionShell>{children}</MotionShell>
+        <TabBar />
         <Toaster />
       </body>
     </html>

@@ -7,7 +7,6 @@ import { getProfile } from "@/actions/profile";
 import { AppHeader } from "@/components/app-header";
 import { AssetTable } from "@/components/asset-table";
 import { SummaryCards } from "@/components/summary-cards";
-import { TabBar } from "@/components/tab-bar";
 import { getSession } from "@/lib/session";
 
 export default async function HomePage() {
@@ -48,7 +47,6 @@ export default async function HomePage() {
         <SummaryCards dashboard={dashboard} />
         <AssetTable dashboard={dashboard} />
       </main>
-      <TabBar />
     </>
   );
 }

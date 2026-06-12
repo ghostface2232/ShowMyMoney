@@ -1,8 +1,10 @@
 // Expense list grouped by day. Tapping a row opens the edit/delete dialog.
+// Rows still waiting for server confirmation (optimistic temp ids) are not editable.
 "use client";
 
 import { useMemo, useState } from "react";
 
+import type { ExpenseInput } from "@/actions/expenses";
 import { ExpenseEditDialog } from "@/components/expense-editor";
 import type { RunExpenseAction } from "@/components/expense-view";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,8 +21,9 @@ type Props = {
   expenses: Expense[];
   categories: ExpenseCategory[];
   members: Member[];
-  disabled: boolean;
   runAction: RunExpenseAction;
+  onUpdate: (expenseId: string, input: ExpenseInput) => void;
+  onDelete: (expenseId: string) => void;
   emptyMessage: string;
 };
 
@@ -28,8 +31,9 @@ export function ExpenseList({
   expenses,
   categories,
   members,
-  disabled,
   runAction,
+  onUpdate,
+  onDelete,
   emptyMessage,
 }: Props) {
   const [editTarget, setEditTarget] = useState<Expense | null>(null);
@@ -102,7 +106,7 @@ export function ExpenseList({
                         ? (memberById.get(expense.member_id) ?? null)
                         : null
                     }
-                    disabled={disabled}
+                    disabled={isOptimisticId(expense.id)}
                     onClick={() => setEditTarget(expense)}
                   />
                 ))}
@@ -116,12 +120,21 @@ export function ExpenseList({
         expense={editTarget}
         categories={categories}
         members={members}
-        disabled={disabled}
         runAction={runAction}
+        onSave={(input) => {
+          if (editTarget) onUpdate(editTarget.id, input);
+        }}
+        onDelete={() => {
+          if (editTarget) onDelete(editTarget.id);
+        }}
         onClose={() => setEditTarget(null)}
       />
     </>
   );
+}
+
+function isOptimisticId(id: string): boolean {
+  return id.startsWith("optimistic-");
 }
 
 function ExpenseRow({
