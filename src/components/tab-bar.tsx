@@ -36,7 +36,9 @@ export function TabBar() {
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 1rem)" }}
     >
-      <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border/60 bg-background/75 p-2 shadow-lg shadow-black/10 backdrop-blur-xl">
+      {/* Translucent glass: low-alpha fill + heavy backdrop blur/saturation so content
+          scrolling underneath stays visible through the bar (iOS tab bar feel). */}
+      <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-background/50 p-2 shadow-lg shadow-black/10 backdrop-blur-2xl backdrop-saturate-150">
         {TABS.map((tab) => {
           const active =
             tab.href === "/"
