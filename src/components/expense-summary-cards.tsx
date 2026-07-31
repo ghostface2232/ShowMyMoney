@@ -102,7 +102,8 @@ export function ExpenseSummaryCards({
               className={cn(
                 "relative flex min-w-0 cursor-pointer flex-col justify-center gap-1 px-4 text-left transition-[background-color,box-shadow] duration-150",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                selected ? "bg-primary/6" : "bg-card hover:bg-muted/40",
+                "bg-card",
+                !selected && "hover:bg-muted/40",
                 card.fullWidthOnMobile ? "py-5" : "py-4",
                 "sm:px-6",
                 card.fullWidthOnMobile && "col-span-2 sm:col-auto",
@@ -118,11 +119,16 @@ export function ExpenseSummaryCards({
               )}
             >
               {selected ? (
+                // Contained highlight: fill + hairline ring live INSIDE the cell
+                // (inset, rounded) so the selection never touches card edges or
+                // dividers — it reads as one object gliding between cells.
+                // -z-10 keeps it under the text (the button's will-change
+                // creates the stacking context).
                 <motion.span
                   aria-hidden
                   layoutId="expense-scope-ring"
                   transition={reducedMotion ? { duration: 0 } : SPRING_DEFAULT}
-                  className="pointer-events-none absolute inset-1.5 rounded-[1.25rem] ring-2 ring-primary/70"
+                  className="pointer-events-none absolute inset-2 -z-10 rounded-2xl bg-primary/7 ring-[1.5px] ring-primary/50 ring-inset"
                   style={{ willChange: "transform" }}
                 />
               ) : null}
