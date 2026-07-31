@@ -65,6 +65,7 @@ import { Input } from "@/components/ui/input";
 import { YearMonthPicker } from "@/components/year-month-picker";
 import { formatKRW, formatYearMonth } from "@/lib/format";
 import { DURATION_BASE, EASE_OUT, SPRING_SOFT } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import type { Category } from "@/types/db";
 
 type Props = {
@@ -480,6 +481,9 @@ function EmptyState({
   return (
     <Card className="shadow-none ring-0">
       <CardContent className="flex min-h-60 flex-col items-center justify-center gap-4 text-center">
+        <span className="inline-flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Plus className="size-5" strokeWidth={2.2} />
+        </span>
         <p className="text-sm text-muted-foreground">
           아직 기록이 없습니다. 첫 달을 추가해 보세요.
         </p>
@@ -535,7 +539,7 @@ function AddGroupRow({
       <button
         type="button"
         onClick={() => setAddingGroup(true)}
-        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-white px-4 text-sm font-medium text-foreground disabled:pointer-events-none disabled:opacity-50"
+        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-transparent bg-card px-4 text-sm font-medium text-foreground shadow-xs ring-1 ring-foreground/5 transition-[background-color,scale] duration-150 ease-out hover:bg-card/70 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50"
       >
         <Plus className="size-3.5" />
         새 그룹 추가
@@ -560,7 +564,7 @@ function GroupSection({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4 px-1">
-        <h2 className="min-w-0 truncate px-1 text-2xl font-semibold">
+        <h2 className="min-w-0 truncate px-1 text-xl font-semibold tracking-tight">
           {group.name}
         </h2>
         <GroupManagementDialog group={group} actions={actions} />
@@ -572,13 +576,14 @@ function GroupSection({
             <TableRowDividers rowCount={group.categories.length + 1} />
             <NameColumn categories={group.categories} />
             <AnimatePresence mode="popLayout" initial={false}>
-              {snapshots.map((snap) => (
+              {snapshots.map((snap, index) => (
                 <SnapshotColumn
                   key={snap.id}
                   snapshot={snap}
                   categories={group.categories}
                   actions={actions}
                   transition={transition}
+                  isLatest={index === 0}
                 />
               ))}
             </AnimatePresence>
@@ -1026,6 +1031,7 @@ type SnapshotColumnProps = {
   categories: Category[];
   actions: TableActions;
   transition: Transition;
+  isLatest: boolean;
 };
 
 function SnapshotColumn({
@@ -1033,6 +1039,7 @@ function SnapshotColumn({
   categories,
   actions,
   transition,
+  isLatest,
 }: SnapshotColumnProps) {
   const columnTotal = useMemo(() => {
     let total = 0;
@@ -1063,8 +1070,21 @@ function SnapshotColumn({
       style={{ willChange: "transform, opacity, width" }}
       className="z-10 flex shrink-0 flex-col overflow-hidden pl-3"
     >
-      <div className="flex h-10 items-center justify-end px-3 text-sm font-medium text-muted-foreground">
-        <span className="truncate">
+      <div
+        className={cn(
+          "flex h-10 items-center justify-end px-3 text-sm",
+          isLatest
+            ? "font-semibold text-foreground"
+            : "font-medium text-muted-foreground",
+        )}
+      >
+        <span
+          className={cn(
+            "flex items-center gap-1.5 truncate",
+            isLatest &&
+              "rounded-full bg-primary/10 px-2 py-0.5 text-[13px] text-primary",
+          )}
+        >
           {formatYearMonth(snapshot.year_month)}
         </span>
       </div>
@@ -1150,7 +1170,7 @@ function AmountCell({
             }
           }}
           placeholder="0"
-          className="h-8 min-w-0 flex-1 cursor-text rounded-full bg-transparent px-2 text-right text-sm tabular-nums focus:outline-none"
+          className="h-8 min-w-0 flex-1 cursor-text rounded-lg bg-muted/60 px-2 text-right text-sm tabular-nums ring-2 ring-primary/50 focus:outline-none"
         />
         {entry ? (
           <Button
@@ -1173,7 +1193,7 @@ function AmountCell({
     <button
       type="button"
       onClick={start}
-      className="flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums"
+      className="group/cell flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
     >
       {amount !== null ? (
         formatKRW(amount)

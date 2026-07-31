@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
 import type { CategoryGroupWithCategories } from "@/actions/categories";
 import type { DashboardData, SnapshotWithEntries } from "@/actions/dashboard";
@@ -12,7 +13,13 @@ import { GrowthDialog } from "@/components/growth-dialog";
 import { hasClientNavigated } from "@/lib/app-navigation";
 import { formatKRW } from "@/lib/format";
 import { calcMultiGrowthSeries } from "@/lib/growth-math";
-import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
+import {
+  DURATION_BASE,
+  EASE_OUT,
+  ENTER_BLUR,
+  ENTER_Y,
+  STAGGER_INTERVAL,
+} from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 type CardDatum = {
@@ -71,19 +78,24 @@ export function SummaryCards({ dashboard }: Props) {
               initial={
                 reducedMotion || hasClientNavigated()
                   ? false
-                  : { opacity: 0, y: 8 }
+                  : { opacity: 0, y: ENTER_Y, filter: ENTER_BLUR }
               }
-              animate={{ opacity: 1, y: 0 }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={
                 reducedMotion
                   ? { duration: 0 }
-                  : { duration: DURATION_BASE, delay: index * 0.04, ease: EASE_OUT }
+                  : {
+                      duration: DURATION_BASE,
+                      delay: index * STAGGER_INTERVAL,
+                      ease: EASE_OUT,
+                    }
               }
               style={{ willChange: "transform, opacity" }}
               className={cn(
-                "relative flex min-w-0 cursor-pointer flex-col justify-center gap-1 bg-card px-4 py-4 text-left transition-colors",
+                "relative flex min-w-0 cursor-pointer flex-col justify-center gap-1 bg-card px-4 text-left transition-colors",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                "hover:bg-muted/70",
+                "hover:bg-muted/50",
+                card.fullWidthOnMobile ? "py-5" : "py-4",
                 "sm:px-6",
                 card.fullWidthOnMobile && "col-span-2 sm:col-auto",
                 // right divider (::after) — inset top/bottom 16px
@@ -97,15 +109,24 @@ export function SummaryCards({ dashboard }: Props) {
                 flags.mobileBottom && "sm:before:hidden",
               )}
             >
-              <span className="truncate text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  "truncate text-muted-foreground",
+                  card.fullWidthOnMobile
+                    ? "text-[13px] font-medium"
+                    : "text-xs",
+                )}
+              >
                 {card.label}
               </span>
               <CountUp
                 value={card.amount}
                 format={formatKRW}
                 className={cn(
-                  "font-heading text-base tabular-nums sm:text-lg",
-                  card.fullWidthOnMobile ? "font-semibold" : "font-medium",
+                  "font-heading font-semibold tabular-nums",
+                  card.fullWidthOnMobile
+                    ? "text-[1.7rem] leading-tight tracking-tight"
+                    : "text-[15px] sm:text-base",
                 )}
               />
               {card.delta !== null ? (
@@ -130,20 +151,24 @@ export function SummaryCards({ dashboard }: Props) {
 function DeltaBadge({ delta, pct }: { delta: number; pct: number | null }) {
   const positive = delta > 0;
   const negative = delta < 0;
-  const sign = positive ? "+" : negative ? "-" : "";
-  const amountText = `${sign}${formatKRW(Math.abs(delta))}`;
+  const amountText = formatKRW(Math.abs(delta));
   const pctText =
-    pct === null ? "" : ` · ${sign}${Math.abs(pct).toFixed(1)}%`;
+    pct === null ? "" : ` · ${Math.abs(pct).toFixed(1)}%`;
 
   return (
     <span
       className={cn(
-        "inline-flex w-fit shrink-0 items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
-        positive && "bg-chart-2/10 text-chart-2",
-        negative && "bg-destructive/10 text-destructive",
+        "mt-0.5 inline-flex w-fit shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+        positive && "bg-positive/10 text-positive",
+        negative && "bg-negative/10 text-negative",
         !positive && !negative && "bg-muted text-muted-foreground",
       )}
     >
+      {positive ? (
+        <ArrowUpRight aria-label="증가" className="size-3" strokeWidth={2.5} />
+      ) : negative ? (
+        <ArrowDownRight aria-label="감소" className="size-3" strokeWidth={2.5} />
+      ) : null}
       {amountText}
       {pctText}
     </span>

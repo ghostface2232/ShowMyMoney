@@ -145,7 +145,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
           <Button
             variant="outline"
             size="sm"
-            className="min-w-26 justify-start gap-2.5 border-transparent bg-white text-foreground hover:bg-white/70 aria-expanded:bg-white/70"
+            className="min-w-26 justify-start gap-2.5 border-transparent bg-card text-foreground shadow-xs ring-1 ring-foreground/5 hover:bg-card/70 aria-expanded:bg-muted/70"
           >
             <Target className="size-4" />
             목표 분석
@@ -440,9 +440,9 @@ function ProgressBar({ pct, status }: { pct: number; status: GoalStatus }) {
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
       <div
         className={cn(
-          "h-full rounded-full transition-[width] duration-300",
-          status === "reached" && "bg-chart-2",
-          status === "overdue" && "bg-destructive",
+          "h-full rounded-full transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          status === "reached" && "bg-positive",
+          status === "overdue" && "bg-negative",
           status === "on-track" && "bg-primary",
         )}
         style={{ width: `${pct}%` }}
@@ -453,10 +453,10 @@ function ProgressBar({ pct, status }: { pct: number; status: GoalStatus }) {
 
 function StatusBadge({ status }: { status: GoalStatus }) {
   const map: Record<GoalStatus, { text: string; className: string }> = {
-    reached: { text: "달성", className: "bg-chart-2/10 text-chart-2" },
+    reached: { text: "달성", className: "bg-positive/10 text-positive" },
     overdue: {
       text: "기한 경과",
-      className: "bg-destructive/10 text-destructive",
+      className: "bg-negative/10 text-negative",
     },
     "on-track": {
       text: "진행 중",

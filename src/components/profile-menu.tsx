@@ -49,17 +49,18 @@ export function ProfileMenu({ displayName, firstUsedAt }: Props) {
       <button
         type="button"
         onClick={() => setProfileOpen(true)}
-        className="group -m-1 flex min-w-0 cursor-pointer flex-col items-start rounded-xl p-1 text-left transition-colors hover:bg-white/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="group -m-1.5 flex min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded-2xl p-1.5 text-left transition-[background-color,scale] duration-150 ease-out select-none hover:bg-foreground/4 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         aria-label="프로필 설정 열기"
       >
-        <span className="block max-w-[min(60vw,24rem)] truncate font-heading text-[1.7rem] font-semibold leading-tight tracking-normal sm:text-3xl">
-          <span className="underline decoration-black decoration-2 underline-offset-4">
-            {displayName}
-          </span>
-          의
+        <span className="block max-w-[min(60vw,24rem)] truncate text-[13px] font-medium text-muted-foreground">
+          {displayName}님의
         </span>
-        <span className="block font-heading text-[1.7rem] font-semibold leading-tight tracking-normal sm:text-3xl">
+        <span className="flex items-center gap-1.5 font-heading text-[1.6rem] font-semibold leading-none tracking-tight sm:text-3xl">
           자산 관리
+          <span
+            aria-hidden
+            className="mt-1 inline-block size-2 rounded-full bg-primary"
+          />
         </span>
       </button>
 

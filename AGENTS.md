@@ -44,7 +44,12 @@ Design reference points: Notion database tables, Figma UI3, Claude web. The visu
 - The expenses page loads one month at a time via the `?ym=` search param and follows the same structure: header → month nav → summary card strip (total / per member / shared, tap to filter scope) → category breakdown → day-grouped transaction list with an inline composer. Expense delta badges invert the asset colors (spending increase = destructive). Page-level month titles use `formatYearMonthLong` ("2026년 6월"); table columns keep the compact `formatYearMonth` ("26_6월"). Expense create/update/delete are optimistic, mirroring the asset table's local-mirror + runInBackground pattern.
 - The asset table orders snapshots with the most recent on the left.
 - Dark mode is supported end-to-end. The theme toggle sits at the top-right of the header.
-- Work with Luma's design tokens instead of overriding them. Borders lean toward rounded (`rounded-xl` and above for cards), shadows stay soft, spacing stays generous. Avoid sharp corners, heavy borders, or dense padding that would fight the preset.
+- Work with Luma's design tokens instead of overriding them. Borders lean toward rounded (`rounded-xl` and above for cards), shadows stay soft, spacing stays generous. Avoid sharp corners, heavy borders, or dense padding that would fight the preset. Never hard-code `bg-white` or raw hex colors — use `bg-card`/token classes so surfaces stay tokenized.
+- Semantic delta colors live in `globals.css`: `--positive` (asset gain / spending decrease) and `--negative`. Delta badges pair the color with a directional arrow icon; the expense page inverts the mapping (spending increase = negative).
+- `--chart-1`…`--chart-5` form a multi-hue categorical identity palette (green/blue/amber/purple/rose) shared by members, growth-chart series, and expense categories. Identity colors must stay stable per entity — expense categories hash their id via `src/lib/category-visual.ts` (which also maps Korean category names to lucide icons); never assign identity colors by rank or index.
+- Expense categories render as tinted-circle glyphs through `src/components/category-icon.tsx` (icon at full color over a ~13% `color-mix` tint) so a category reads as the same object in rows, the breakdown card, and chips.
+- Dialogs present as centered modals on `sm+` and as iOS-style bottom sheets (drawer curve, grab handle, safe-area padding) on mobile — this lives in `src/components/ui/dialog.tsx`. AlertDialogs stay centered everywhere.
+- Pressable surfaces give tactile feedback: `active:scale-[0.97]` (Button primitive) or `whileTap`/`active:scale-[0.96~0.98]` on rows, chips, and tab links. Keep scale ≥ 0.95.
 - Motion usage favors `layout`, `layoutId`, and `AnimatePresence` for layout-sharing transitions. All tunables live in `src/lib/motion.ts` — import constants from there instead of hard-coding values.
 - Animation constants (defined in `src/lib/motion.ts`):
   - `SPRING_DEFAULT` — `{ type: "spring", stiffness: 380, damping: 34 }`. Default for small, interactive elements (buttons, micro transitions).
@@ -89,8 +94,8 @@ RLS is enabled on every table with no policies. This blocks any access via the p
 
 ## Formatting Rules
 
-- Store amounts as `numeric`. Render with `Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW" })`.
-- Zero is displayed explicitly as `₩0`, never as an empty cell.
+- Store amounts as `numeric`. Render via `formatKRW` in `src/lib/format.ts`: comma-grouped digits with the native `원` suffix ("1,234,567원"), following Korean consumer-finance convention (Toss style) instead of the `₩` symbol.
+- Zero is displayed explicitly as `0원`, never as an empty cell.
 - Negative asset values are out of scope for the current version. Treat any negative input as a validation error.
 - Dates in the UI follow the app's casual form, for example `26_3월` for year_month `202603`.
 

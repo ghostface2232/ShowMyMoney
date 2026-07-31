@@ -1,13 +1,13 @@
 // Currency/year-month format helpers used across the UI. Provides ko-KR KRW notation and "26_3월" format.
 
-const currencyFormatter = new Intl.NumberFormat("ko-KR", {
-  style: "currency",
-  currency: "KRW",
+// Korean consumer-finance convention (Toss, 뱅크샐러드): "1,234,567원" with the
+// native 원 suffix instead of the ₩ symbol. Zero renders explicitly as "0원".
+const numberFormatter = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 0,
 });
 
 export function formatKRW(amount: number): string {
-  return currencyFormatter.format(amount);
+  return `${numberFormatter.format(amount)}원`;
 }
 
 export function formatYearMonth(yearMonth: number): string {

@@ -86,7 +86,7 @@ export function MonthManagementButton({ snapshots }: Props) {
             variant="outline"
             size="sm"
             disabled={pending}
-            className="min-w-26 justify-start gap-2.5 border-transparent bg-white text-foreground hover:bg-white/70 aria-expanded:bg-white/70"
+            className="min-w-26 justify-start gap-2.5 border-transparent bg-card text-foreground shadow-xs ring-1 ring-foreground/5 hover:bg-card/70 aria-expanded:bg-muted/70"
           >
             <CalendarDays className="size-4" />
             월별 관리

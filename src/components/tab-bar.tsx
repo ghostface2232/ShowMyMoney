@@ -59,7 +59,8 @@ export function TabBar() {
               onClick={() => saveScrollPosition(pathname)}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative flex items-center gap-2 rounded-full px-7 py-3.5 text-base font-medium transition-colors",
+                "relative flex items-center gap-2 rounded-full px-6 py-3 text-[15px] font-medium",
+                "transition-[color,scale] duration-150 ease-out active:scale-[0.96]",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 active
                   ? "text-primary-foreground"
@@ -75,7 +76,11 @@ export function TabBar() {
                   style={{ willChange: "transform" }}
                 />
               ) : null}
-              <Icon className="relative size-6" aria-hidden />
+              <Icon
+                className="relative size-5.5"
+                strokeWidth={active ? 2.4 : 2}
+                aria-hidden
+              />
               <span className="relative">{tab.label}</span>
             </Link>
           );

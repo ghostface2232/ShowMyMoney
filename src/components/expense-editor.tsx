@@ -19,8 +19,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { getCategoryVisual } from "@/lib/category-visual";
 import { SCOPE_SHARED } from "@/lib/expense-scope";
-import { DURATION_FAST, EASE_OUT } from "@/lib/motion";
+import { DURATION_FAST, EASE_OUT, TAP_SCALE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { Expense, ExpenseCategory, Member } from "@/types/db";
 
@@ -143,18 +144,21 @@ export function ExpenseComposer({
           initial={reducedMotion ? false : { opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+          whileTap={reducedMotion ? undefined : { scale: TAP_SCALE }}
           transition={
             reducedMotion
               ? { duration: 0 }
               : { duration: DURATION_FAST, ease: EASE_OUT }
           }
           className={cn(
-            "flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed py-3 text-sm text-muted-foreground transition-colors",
-            "hover:border-foreground/30 hover:text-foreground",
+            "flex w-full cursor-pointer items-center gap-3 rounded-4xl bg-card p-3 text-left text-sm font-medium text-muted-foreground transition-colors",
+            "hover:text-foreground",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
           )}
         >
-          <Plus className="size-4" />
+          <span className="inline-flex size-10 items-center justify-center rounded-full bg-primary/12 text-primary">
+            <Plus className="size-[18px]" strokeWidth={2.2} />
+          </span>
           지출 추가
         </motion.button>
       )}
@@ -322,33 +326,44 @@ function ExpenseFields({
           }}
           placeholder="금액 (원)"
           maxLength={13}
-          className="flex-1 text-right tabular-nums"
+          className="h-10 flex-1 text-right text-base font-semibold tabular-nums placeholder:font-normal"
         />
         <Input
           type="date"
           value={draft.spentOn}
           onChange={(event) => onChange({ spentOn: event.target.value })}
-          className="w-36 shrink-0"
+          className="h-10 w-36 shrink-0"
         />
       </div>
 
       <FieldGroup label="카테고리">
         {categories.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
-            {categories.map((category) => (
-              <Chip
-                key={category.id}
-                selected={draft.categoryId === category.id}
-                onClick={() =>
-                  onChange({
-                    categoryId:
-                      draft.categoryId === category.id ? null : category.id,
-                  })
-                }
-              >
-                {category.name}
-              </Chip>
-            ))}
+            {categories.map((category) => {
+              const { icon: Icon, color } = getCategoryVisual(
+                category.id,
+                category.name,
+              );
+              const selected = draft.categoryId === category.id;
+              return (
+                <Chip
+                  key={category.id}
+                  selected={selected}
+                  onClick={() =>
+                    onChange({
+                      categoryId: selected ? null : category.id,
+                    })
+                  }
+                >
+                  <Icon
+                    aria-hidden
+                    className="size-3.5"
+                    style={selected ? undefined : { color }}
+                  />
+                  {category.name}
+                </Chip>
+              );
+            })}
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
@@ -441,11 +456,12 @@ function Chip({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+        "transition-[background-color,color,border-color,scale] duration-150 ease-out active:scale-[0.96]",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         selected
           ? "border-transparent bg-primary text-primary-foreground"
-          : "bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+          : "border-border/70 bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground",
       )}
     >
       {children}

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 
+import { Wallet } from "lucide-react";
+
 import { signUp } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,7 +57,10 @@ export default function SignupPage() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>새 계정 만들기</CardTitle>
+        <span className="mb-1 inline-flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+          <Wallet className="size-5.5" strokeWidth={2.2} aria-hidden />
+        </span>
+        <CardTitle className="text-xl tracking-tight">새 계정 만들기</CardTitle>
         <CardDescription>표시 이름과 PIN을 설정하세요.</CardDescription>
       </CardHeader>
       <CardContent>
