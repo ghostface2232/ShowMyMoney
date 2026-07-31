@@ -17,7 +17,6 @@ import {
   EASE_OUT,
   ENTER_BLUR,
   ENTER_Y,
-  SPRING_DEFAULT,
   STAGGER_INTERVAL,
   TAP_SCALE,
 } from "@/lib/motion";
@@ -73,6 +72,10 @@ export function ExpenseSummaryCards({
         {cards.map((card, index) => {
           const flags = computeDividerFlags(card, index, cards);
           const selected = scope === card.key;
+          // Focus by de-emphasis (iOS chart-legend style): while a specific scope
+          // is active, the other cards recede instead of the active one gaining
+          // chrome — the default "전체" view stays completely undecorated.
+          const dimmed = scope !== SCOPE_ALL && !selected;
           return (
             <motion.button
               key={card.key}
@@ -118,51 +121,43 @@ export function ExpenseSummaryCards({
                 flags.mobileBottom && "sm:before:hidden",
               )}
             >
-              {selected ? (
-                // Contained highlight: fill + hairline ring live INSIDE the cell
-                // (inset, rounded) so the selection never touches card edges or
-                // dividers — it reads as one object gliding between cells.
-                // -z-10 keeps it under the text (the button's will-change
-                // creates the stacking context).
-                <motion.span
-                  aria-hidden
-                  layoutId="expense-scope-ring"
-                  transition={reducedMotion ? { duration: 0 } : SPRING_DEFAULT}
-                  className="pointer-events-none absolute inset-2 -z-10 rounded-2xl bg-primary/7 ring-[1.5px] ring-primary/50 ring-inset"
-                  style={{ willChange: "transform" }}
-                />
-              ) : null}
-              <span
+              <div
                 className={cn(
-                  "flex items-center gap-1.5 truncate text-muted-foreground",
-                  card.fullWidthOnMobile
-                    ? "text-[13px] font-medium"
-                    : "text-xs",
-                  selected && "text-foreground",
+                  "flex min-w-0 flex-col gap-1 transition-opacity duration-200",
+                  dimmed && "opacity-40",
                 )}
               >
-                {card.dotColor ? (
-                  <span
-                    aria-hidden
-                    className="inline-block size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: card.dotColor }}
-                  />
+                <span
+                  className={cn(
+                    "flex items-center gap-1.5 truncate text-muted-foreground",
+                    card.fullWidthOnMobile
+                      ? "text-[13px] font-medium"
+                      : "text-xs",
+                  )}
+                >
+                  {card.dotColor ? (
+                    <span
+                      aria-hidden
+                      className="inline-block size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: card.dotColor }}
+                    />
+                  ) : null}
+                  {card.label}
+                </span>
+                <CountUp
+                  value={card.amount}
+                  format={formatKRW}
+                  className={cn(
+                    "font-heading font-semibold tabular-nums",
+                    card.fullWidthOnMobile
+                      ? "text-[1.7rem] leading-tight tracking-tight"
+                      : "text-[15px] sm:text-base",
+                  )}
+                />
+                {card.delta !== null ? (
+                  <DeltaBadge delta={card.delta} pct={card.deltaPct} />
                 ) : null}
-                {card.label}
-              </span>
-              <CountUp
-                value={card.amount}
-                format={formatKRW}
-                className={cn(
-                  "font-heading font-semibold tabular-nums",
-                  card.fullWidthOnMobile
-                    ? "text-[1.7rem] leading-tight tracking-tight"
-                    : "text-[15px] sm:text-base",
-                )}
-              />
-              {card.delta !== null ? (
-                <DeltaBadge delta={card.delta} pct={card.deltaPct} />
-              ) : null}
+              </div>
             </motion.button>
           );
         })}
