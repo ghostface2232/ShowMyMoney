@@ -83,7 +83,9 @@ export function ExpenseCategoryBreakdown({
                       {formatKRW(item.amount)}
                     </span>
                     <span className="w-9 text-right text-xs text-muted-foreground tabular-nums">
-                      {sharePct.toFixed(0)}%
+                      {sharePct > 0 && sharePct < 1
+                        ? "<1%"
+                        : `${sharePct.toFixed(0)}%`}
                     </span>
                   </p>
                 </div>

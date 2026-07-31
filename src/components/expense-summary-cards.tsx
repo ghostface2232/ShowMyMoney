@@ -64,6 +64,13 @@ export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
       >
         {cards.map((card, index) => {
           const flags = computeDividerFlags(card, index, cards);
+          // With an odd number of group cells the last one would sit next to an
+          // empty cell on mobile — let it span the full row instead.
+          const groupCount = cards.length - 1;
+          const spansLastRow =
+            !card.fullWidthOnMobile &&
+            index === cards.length - 1 &&
+            groupCount % 2 === 1;
           return (
             <motion.div
               key={card.key}
@@ -88,7 +95,8 @@ export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
                 "relative flex min-w-0 flex-col justify-center gap-1 bg-card px-4 text-left",
                 card.fullWidthOnMobile ? "py-5" : "py-4",
                 "sm:px-6",
-                card.fullWidthOnMobile && "col-span-2 sm:col-auto",
+                (card.fullWidthOnMobile || spansLastRow) &&
+                  "col-span-2 sm:col-auto",
                 // right divider (::after) — inset top/bottom 16px
                 "after:pointer-events-none after:absolute after:top-4 after:bottom-4 after:right-0 after:w-px after:bg-border after:content-['']",
                 !flags.mobileRight && "after:hidden",
@@ -121,7 +129,7 @@ export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
                 className={cn(
                   "font-heading font-semibold tabular-nums",
                   card.fullWidthOnMobile
-                    ? "text-[1.7rem] leading-tight tracking-tight"
+                    ? "text-3xl leading-tight tracking-tight"
                     : "text-[15px] sm:text-base",
                 )}
               />

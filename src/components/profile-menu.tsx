@@ -55,12 +55,8 @@ export function ProfileMenu({ displayName, firstUsedAt }: Props) {
         <span className="block max-w-[min(60vw,24rem)] truncate text-[13px] font-medium text-muted-foreground">
           {displayName}님의
         </span>
-        <span className="flex items-center gap-1.5 font-heading text-[1.6rem] font-semibold leading-none tracking-tight sm:text-3xl">
+        <span className="block font-heading text-[1.6rem] font-semibold leading-none tracking-tight sm:text-3xl">
           자산 관리
-          <span
-            aria-hidden
-            className="mt-1 inline-block size-2 rounded-full bg-primary"
-          />
         </span>
       </button>
 

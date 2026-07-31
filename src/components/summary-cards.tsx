@@ -69,6 +69,13 @@ export function SummaryCards({ dashboard }: Props) {
       >
         {cards.map((card, index) => {
           const flags = computeDividerFlags(card, index, cards);
+          // With an odd number of group cells the last one would sit next to an
+          // empty cell on mobile — let it span the full row instead.
+          const groupCount = cards.length - 1;
+          const spansLastRow =
+            !card.fullWidthOnMobile &&
+            index === cards.length - 1 &&
+            groupCount % 2 === 1;
           return (
             <motion.button
               key={card.key}
@@ -97,14 +104,15 @@ export function SummaryCards({ dashboard }: Props) {
                 "hover:bg-muted/50",
                 card.fullWidthOnMobile ? "py-5" : "py-4",
                 "sm:px-6",
-                card.fullWidthOnMobile && "col-span-2 sm:col-auto",
+                (card.fullWidthOnMobile || spansLastRow) &&
+                  "col-span-2 sm:col-auto",
                 // right divider (::after) — inset top/bottom 16px
-                "after:pointer-events-none after:absolute after:top-4 after:bottom-4 after:right-0 after:w-[1.2px] after:bg-border after:content-['']",
+                "after:pointer-events-none after:absolute after:top-4 after:bottom-4 after:right-0 after:w-px after:bg-border after:content-['']",
                 !flags.mobileRight && "after:hidden",
                 !flags.mobileRight && flags.desktopRight && "sm:after:block",
                 flags.mobileRight && !flags.desktopRight && "sm:after:hidden",
                 // bottom divider (::before) — inset left/right 16px
-                "before:pointer-events-none before:absolute before:bottom-0 before:left-4 before:right-4 before:h-[1.2px] before:bg-border before:content-['']",
+                "before:pointer-events-none before:absolute before:bottom-0 before:left-4 before:right-4 before:h-px before:bg-border before:content-['']",
                 !flags.mobileBottom && "before:hidden",
                 flags.mobileBottom && "sm:before:hidden",
               )}
@@ -125,7 +133,7 @@ export function SummaryCards({ dashboard }: Props) {
                 className={cn(
                   "font-heading font-semibold tabular-nums",
                   card.fullWidthOnMobile
-                    ? "text-[1.7rem] leading-tight tracking-tight"
+                    ? "text-3xl leading-tight tracking-tight"
                     : "text-[15px] sm:text-base",
                 )}
               />

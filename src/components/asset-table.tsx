@@ -571,23 +571,35 @@ function GroupSection({
       </div>
 
       <Card className="p-4 shadow-none ring-0">
-        <div className="overflow-x-auto">
-          <div className="relative flex min-w-fit">
-            <TableRowDividers rowCount={group.categories.length + 1} />
-            <NameColumn categories={group.categories} />
-            <AnimatePresence mode="popLayout" initial={false}>
-              {snapshots.map((snap, index) => (
-                <SnapshotColumn
-                  key={snap.id}
-                  snapshot={snap}
-                  categories={group.categories}
-                  actions={actions}
-                  transition={transition}
-                  isLatest={index === 0}
-                />
-              ))}
-            </AnimatePresence>
+        <div className="relative">
+          <div className="overflow-x-auto">
+            <div className="relative flex min-w-fit">
+              <TableRowDividers rowCount={group.categories.length + 1} />
+              <NameColumn categories={group.categories} />
+              <AnimatePresence mode="popLayout" initial={false}>
+                {snapshots.map((snap, index) => (
+                  <SnapshotColumn
+                    key={snap.id}
+                    snapshot={snap}
+                    categories={group.categories}
+                    actions={actions}
+                    transition={transition}
+                    isLatest={index === 0}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
           </div>
+          {/* Right-edge fade: signals that more months scroll under the card edge.
+              Mirrors the name column's left fade (same transparent-card gradient). */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 right-0 z-30 w-5"
+            style={{
+              background:
+                "linear-gradient(to left, var(--card), oklch(from var(--card) l c h / 0))",
+            }}
+          />
         </div>
       </Card>
     </section>
@@ -640,7 +652,7 @@ function TableRowDividers({ rowCount }: { rowCount: number }) {
       {Array.from({ length: lineCount }, (_, index) => (
         <span
           key={index}
-          className="absolute inset-x-0 border-t-[1.2px]"
+          className="absolute inset-x-0 border-t border-border/80"
           style={{ top: 40 + index * 44 }}
         />
       ))}
@@ -743,7 +755,7 @@ function GroupManagementDialog({
                 <motion.ul
                   layout
                   transition={transition}
-                  className="divide-y-[1.2px]"
+                  className="divide-y"
                 >
                   <AnimatePresence initial={false}>
                     {group.categories.map((category, index) => (

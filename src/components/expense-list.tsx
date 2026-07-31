@@ -184,12 +184,9 @@ function ExpenseRow({
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[15px] font-medium">{title}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <p className="mt-0.5 flex items-center gap-2 text-[13px] text-muted-foreground">
           {subCategory ? (
-            <>
-              <span className="truncate">{subCategory}</span>
-              <span aria-hidden>·</span>
-            </>
+            <span className="truncate">{subCategory}</span>
           ) : null}
           <span className="inline-flex shrink-0 items-center gap-1">
             <span
