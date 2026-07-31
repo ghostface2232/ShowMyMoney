@@ -20,6 +20,7 @@ import {
 import { ExpenseCategoryBreakdown } from "@/components/expense-category-breakdown";
 import { ExpenseComposer } from "@/components/expense-editor";
 import { ExpenseList } from "@/components/expense-list";
+import { ExpenseScopeSegments } from "@/components/expense-scope-segments";
 import { ExpenseSummaryCards } from "@/components/expense-summary-cards";
 import { Button } from "@/components/ui/button";
 import { YearMonthPicker } from "@/components/year-month-picker";
@@ -308,9 +309,15 @@ export function ExpenseView({ dashboard }: Props) {
         members={dashboard.members}
         totals={currentTotals}
         prevTotals={dashboard.prevTotals}
-        scope={effectiveScope}
-        onScopeChange={setScope}
       />
+
+      {dashboard.members.length > 0 ? (
+        <ExpenseScopeSegments
+          members={dashboard.members}
+          scope={effectiveScope}
+          onScopeChange={setScope}
+        />
+      ) : null}
 
       {scopedExpenses.length > 0 ? (
         <ExpenseCategoryBreakdown

@@ -1,5 +1,7 @@
-// Expense summary strip. Tap a card to switch the view scope (all/member/shared); shows month-over-month deltas.
-// Unlike assets, increased spending is negative, so delta colors are inverted (increase = destructive).
+// Expense summary strip: month totals (all / per member / shared) with
+// month-over-month deltas. Display-only — scope filtering lives in the
+// segmented control below (ExpenseScopeSegments).
+// Unlike assets, increased spending is negative, so delta colors are inverted.
 "use client";
 
 import { useMemo } from "react";
@@ -18,7 +20,6 @@ import {
   ENTER_BLUR,
   ENTER_Y,
   STAGGER_INTERVAL,
-  TAP_SCALE,
 } from "@/lib/motion";
 import type { Member } from "@/types/db";
 import { cn } from "@/lib/utils";
@@ -43,17 +44,9 @@ type Props = {
   members: Member[];
   totals: ExpenseScopeTotals;
   prevTotals: ExpenseScopeTotals | null;
-  scope: string;
-  onScopeChange: (scope: string) => void;
 };
 
-export function ExpenseSummaryCards({
-  members,
-  totals,
-  prevTotals,
-  scope,
-  onScopeChange,
-}: Props) {
+export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
   const reducedMotion = useReducedMotion();
 
   const cards = useMemo(
@@ -71,19 +64,9 @@ export function ExpenseSummaryCards({
       >
         {cards.map((card, index) => {
           const flags = computeDividerFlags(card, index, cards);
-          const selected = scope === card.key;
-          // Focus by de-emphasis (iOS chart-legend style): while a specific scope
-          // is active, the other cards recede instead of the active one gaining
-          // chrome — the default "전체" view stays completely undecorated.
-          const dimmed = scope !== SCOPE_ALL && !selected;
           return (
-            <motion.button
+            <motion.div
               key={card.key}
-              type="button"
-              onClick={() =>
-                onScopeChange(selected ? SCOPE_ALL : card.key)
-              }
-              aria-pressed={selected}
               // Entry stagger only on initial load/refresh, not when remounting on a tab switch.
               initial={
                 reducedMotion || hasClientNavigated()
@@ -91,7 +74,6 @@ export function ExpenseSummaryCards({
                   : { opacity: 0, y: ENTER_Y, filter: ENTER_BLUR }
               }
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              whileTap={reducedMotion ? undefined : { scale: TAP_SCALE }}
               transition={
                 reducedMotion
                   ? { duration: 0 }
@@ -103,10 +85,7 @@ export function ExpenseSummaryCards({
               }
               style={{ willChange: "transform, opacity" }}
               className={cn(
-                "relative flex min-w-0 cursor-pointer flex-col justify-center gap-1 px-4 text-left transition-[background-color,box-shadow] duration-150",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                "bg-card",
-                !selected && "hover:bg-muted/40",
+                "relative flex min-w-0 flex-col justify-center gap-1 bg-card px-4 text-left",
                 card.fullWidthOnMobile ? "py-5" : "py-4",
                 "sm:px-6",
                 card.fullWidthOnMobile && "col-span-2 sm:col-auto",
@@ -121,44 +100,35 @@ export function ExpenseSummaryCards({
                 flags.mobileBottom && "sm:before:hidden",
               )}
             >
-              <div
+              <span
                 className={cn(
-                  "flex min-w-0 flex-col gap-1 transition-opacity duration-200",
-                  dimmed && "opacity-40",
+                  "flex items-center gap-1.5 truncate text-muted-foreground",
+                  card.fullWidthOnMobile ? "text-[13px] font-medium" : "text-xs",
                 )}
               >
-                <span
-                  className={cn(
-                    "flex items-center gap-1.5 truncate text-muted-foreground",
-                    card.fullWidthOnMobile
-                      ? "text-[13px] font-medium"
-                      : "text-xs",
-                  )}
-                >
-                  {card.dotColor ? (
-                    <span
-                      aria-hidden
-                      className="inline-block size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: card.dotColor }}
-                    />
-                  ) : null}
-                  {card.label}
-                </span>
-                <CountUp
-                  value={card.amount}
-                  format={formatKRW}
-                  className={cn(
-                    "font-heading font-semibold tabular-nums",
-                    card.fullWidthOnMobile
-                      ? "text-[1.7rem] leading-tight tracking-tight"
-                      : "text-[15px] sm:text-base",
-                  )}
-                />
-                {card.delta !== null ? (
-                  <DeltaBadge delta={card.delta} pct={card.deltaPct} />
+                {card.dotColor ? (
+                  <span
+                    aria-hidden
+                    className="inline-block size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: card.dotColor }}
+                  />
                 ) : null}
-              </div>
-            </motion.button>
+                {card.label}
+              </span>
+              <CountUp
+                value={card.amount}
+                format={formatKRW}
+                className={cn(
+                  "font-heading font-semibold tabular-nums",
+                  card.fullWidthOnMobile
+                    ? "text-[1.7rem] leading-tight tracking-tight"
+                    : "text-[15px] sm:text-base",
+                )}
+              />
+              {card.delta !== null ? (
+                <DeltaBadge delta={card.delta} pct={card.deltaPct} />
+              ) : null}
+            </motion.div>
           );
         })}
       </Card>
