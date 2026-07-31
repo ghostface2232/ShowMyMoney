@@ -1,4 +1,4 @@
-// Currency/year-month format helpers used across the UI. Provides ko-KR KRW notation and "26_3월" format.
+// Currency/year-month format helpers used across the UI. Provides ko-KR KRW notation and "26년 3월" format.
 
 // Korean consumer-finance convention (Toss, 뱅크샐러드): "1,234,567원" with the
 // native 원 suffix instead of the ₩ symbol. Zero renders explicitly as "0원".
@@ -14,10 +14,10 @@ export function formatYearMonth(yearMonth: number): string {
   const year = Math.floor(yearMonth / 100);
   const month = yearMonth % 100;
   const yy = String(year).slice(-2);
-  return `${yy}_${month}월`;
+  return `${yy}년 ${month}월`;
 }
 
-// Long form for page-level titles, e.g. "2026년 6월". Table columns keep the compact "26_6월" form.
+// Long form for page-level titles, e.g. "2026년 6월". Table columns keep the compact "26년 6월" form.
 export function formatYearMonthLong(yearMonth: number): string {
   const year = Math.floor(yearMonth / 100);
   const month = yearMonth % 100;
