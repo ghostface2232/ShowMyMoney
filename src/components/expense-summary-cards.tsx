@@ -1,9 +1,12 @@
-// Expense summary strip. Tap a card to switch the view scope (all/member/shared); shows month-over-month deltas.
-// Unlike assets, increased spending is negative, so delta colors are inverted (increase = destructive).
+// Expense summary strip: month totals (all / per member / shared) with
+// month-over-month deltas. Display-only — scope filtering lives in the
+// segmented control below (ExpenseScopeSegments).
+// Unlike assets, increased spending is negative, so delta colors are inverted.
 "use client";
 
 import { useMemo } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
 import type { ExpenseScopeTotals } from "@/actions/expense-dashboard";
 import { CountUp } from "@/components/count-up";
@@ -11,7 +14,13 @@ import { Card } from "@/components/ui/card";
 import { hasClientNavigated } from "@/lib/app-navigation";
 import { SCOPE_ALL, SCOPE_SHARED } from "@/lib/expense-scope";
 import { formatKRW } from "@/lib/format";
-import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
+import {
+  DURATION_BASE,
+  EASE_OUT,
+  ENTER_BLUR,
+  ENTER_Y,
+  STAGGER_INTERVAL,
+} from "@/lib/motion";
 import type { Member } from "@/types/db";
 import { cn } from "@/lib/utils";
 
@@ -35,17 +44,9 @@ type Props = {
   members: Member[];
   totals: ExpenseScopeTotals;
   prevTotals: ExpenseScopeTotals | null;
-  scope: string;
-  onScopeChange: (scope: string) => void;
 };
 
-export function ExpenseSummaryCards({
-  members,
-  totals,
-  prevTotals,
-  scope,
-  onScopeChange,
-}: Props) {
+export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
   const reducedMotion = useReducedMotion();
 
   const cards = useMemo(
@@ -63,34 +64,39 @@ export function ExpenseSummaryCards({
       >
         {cards.map((card, index) => {
           const flags = computeDividerFlags(card, index, cards);
-          const selected = scope === card.key;
+          // With an odd number of group cells the last one would sit next to an
+          // empty cell on mobile — let it span the full row instead.
+          const groupCount = cards.length - 1;
+          const spansLastRow =
+            !card.fullWidthOnMobile &&
+            index === cards.length - 1 &&
+            groupCount % 2 === 1;
           return (
-            <motion.button
+            <motion.div
               key={card.key}
-              type="button"
-              onClick={() =>
-                onScopeChange(selected ? SCOPE_ALL : card.key)
-              }
-              aria-pressed={selected}
               // Entry stagger only on initial load/refresh, not when remounting on a tab switch.
               initial={
                 reducedMotion || hasClientNavigated()
                   ? false
-                  : { opacity: 0, y: 8 }
+                  : { opacity: 0, y: ENTER_Y, filter: ENTER_BLUR }
               }
-              animate={{ opacity: 1, y: 0 }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={
                 reducedMotion
                   ? { duration: 0 }
-                  : { duration: DURATION_BASE, delay: index * 0.04, ease: EASE_OUT }
+                  : {
+                      duration: DURATION_BASE,
+                      delay: index * STAGGER_INTERVAL,
+                      ease: EASE_OUT,
+                    }
               }
               style={{ willChange: "transform, opacity" }}
               className={cn(
-                "relative flex min-w-0 cursor-pointer flex-col justify-center gap-1 px-4 py-4 text-left transition-colors",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                selected ? "bg-muted/60" : "bg-card hover:bg-muted/40",
+                "relative flex min-w-0 flex-col justify-center gap-1 bg-card px-4 text-left",
+                card.fullWidthOnMobile ? "py-5" : "py-4",
                 "sm:px-6",
-                card.fullWidthOnMobile && "col-span-2 sm:col-auto",
+                (card.fullWidthOnMobile || spansLastRow) &&
+                  "col-span-2 sm:col-auto",
                 // right divider (::after) — inset top/bottom 16px
                 "after:pointer-events-none after:absolute after:top-4 after:bottom-4 after:right-0 after:w-px after:bg-border after:content-['']",
                 !flags.mobileRight && "after:hidden",
@@ -102,7 +108,12 @@ export function ExpenseSummaryCards({
                 flags.mobileBottom && "sm:before:hidden",
               )}
             >
-              <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  "flex items-center gap-1.5 truncate text-muted-foreground",
+                  card.fullWidthOnMobile ? "text-[13px] font-medium" : "text-xs",
+                )}
+              >
                 {card.dotColor ? (
                   <span
                     aria-hidden
@@ -116,14 +127,16 @@ export function ExpenseSummaryCards({
                 value={card.amount}
                 format={formatKRW}
                 className={cn(
-                  "font-heading text-base tabular-nums sm:text-lg",
-                  card.fullWidthOnMobile ? "font-semibold" : "font-medium",
+                  "font-heading font-semibold tabular-nums",
+                  card.fullWidthOnMobile
+                    ? "text-3xl leading-tight tracking-tight"
+                    : "text-[15px] sm:text-base",
                 )}
               />
               {card.delta !== null ? (
                 <DeltaBadge delta={card.delta} pct={card.deltaPct} />
               ) : null}
-            </motion.button>
+            </motion.div>
           );
         })}
       </Card>
@@ -139,19 +152,24 @@ export function ExpenseSummaryCards({
 function DeltaBadge({ delta, pct }: { delta: number; pct: number | null }) {
   const increased = delta > 0;
   const decreased = delta < 0;
-  const sign = increased ? "+" : decreased ? "-" : "";
-  const amountText = `${sign}${formatKRW(Math.abs(delta))}`;
-  const pctText = pct === null ? "" : ` · ${sign}${Math.abs(pct).toFixed(1)}%`;
+  const amountText = formatKRW(Math.abs(delta));
+  const pctText = pct === null ? "" : ` · ${Math.abs(pct).toFixed(1)}%`;
 
   return (
     <span
       className={cn(
-        "inline-flex w-fit shrink-0 items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
-        increased && "bg-destructive/10 text-destructive",
-        decreased && "bg-chart-2/10 text-chart-2",
+        "mt-0.5 inline-flex w-fit shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums",
+        // Spending going up is a bad delta, so the colors invert vs the asset cards.
+        increased && "bg-negative/10 text-negative",
+        decreased && "bg-positive/10 text-positive",
         !increased && !decreased && "bg-muted text-muted-foreground",
       )}
     >
+      {increased ? (
+        <ArrowUpRight aria-label="증가" className="size-3" strokeWidth={2.5} />
+      ) : decreased ? (
+        <ArrowDownRight aria-label="감소" className="size-3" strokeWidth={2.5} />
+      ) : null}
       {amountText}
       {pctText}
     </span>

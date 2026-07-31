@@ -62,11 +62,18 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-4xl bg-popover p-6 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // Mobile-first: an iOS-style bottom sheet (slides up with the drawer curve).
+          "fixed inset-x-0 bottom-0 z-50 grid w-full max-h-[calc(100dvh-3rem)] gap-6 rounded-t-4xl bg-popover p-6 pb-[max(env(safe-area-inset-bottom),1.5rem)] text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 outline-none duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-1/2 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-1/2",
+          // Desktop (sm+): centered modal with the original zoom presentation.
+          "sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl sm:pb-6 sm:duration-100 sm:ease-out sm:data-open:zoom-in-95 sm:data-open:slide-in-from-bottom-0 sm:data-closed:zoom-out-95 sm:data-closed:slide-out-to-bottom-0",
           className
         )}
         {...props}
       >
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-2.5 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full bg-muted-foreground/25 sm:hidden"
+        />
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>

@@ -21,6 +21,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -64,11 +66,17 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.845 0.143 164.978);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.596 0.145 163.225);
-  --chart-4: oklch(0.508 0.118 165.612);
-  --chart-5: oklch(0.432 0.095 166.913);
+  /* Categorical palette: five distinct hues tuned to sit beside the brand green
+     (similar lightness/chroma). Used for members, chart series, and category tints —
+     identity colors must be stable, so never assign them by rank. */
+  --chart-1: oklch(0.68 0.14 158);
+  --chart-2: oklch(0.62 0.12 245);
+  --chart-3: oklch(0.72 0.13 75);
+  --chart-4: oklch(0.62 0.14 300);
+  --chart-5: oklch(0.65 0.13 20);
+  /* Semantic delta colors: asset gain / spending decrease read as positive. */
+  --positive: oklch(0.6 0.15 156);
+  --negative: oklch(0.577 0.196 25.5);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -85,11 +93,17 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans;
+    @apply font-sans antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
 }

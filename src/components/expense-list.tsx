@@ -3,12 +3,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import type { ExpenseInput } from "@/actions/expenses";
+import { CategoryIcon } from "@/components/category-icon";
 import { ExpenseEditDialog } from "@/components/expense-editor";
 import type { RunExpenseAction } from "@/components/expense-view";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDayLabel, formatKRW } from "@/lib/format";
+import { SPRING_SOFT } from "@/lib/motion";
 import type { Expense, ExpenseCategory, Member } from "@/types/db";
 
 type DayGroup = {
@@ -37,6 +40,7 @@ export function ExpenseList({
   emptyMessage,
 }: Props) {
   const [editTarget, setEditTarget] = useState<Expense | null>(null);
+  const reducedMotion = useReducedMotion();
 
   const categoryNameById = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name] as const)),
@@ -82,34 +86,48 @@ export function ExpenseList({
       <div className="flex flex-col gap-4">
         {groups.map((group) => (
           <section key={group.date}>
-            <div className="flex items-baseline justify-between px-2 pb-1.5">
-              <h3 className="text-xs font-medium text-muted-foreground">
+            <div className="flex items-baseline justify-between px-3 pb-2">
+              <h3 className="text-[13px] font-medium text-muted-foreground">
                 {formatDayLabel(group.date)}
               </h3>
-              <span className="text-xs text-muted-foreground tabular-nums">
+              <span className="text-[13px] font-medium text-muted-foreground tabular-nums">
                 {formatKRW(group.total)}
               </span>
             </div>
             <Card className="gap-0 p-1.5 shadow-none ring-0">
               <ul className="flex flex-col">
-                {group.expenses.map((expense) => (
-                  <ExpenseRow
-                    key={expense.id}
-                    expense={expense}
-                    categoryName={
-                      expense.category_id
-                        ? (categoryNameById.get(expense.category_id) ?? null)
-                        : null
-                    }
-                    member={
-                      expense.member_id
-                        ? (memberById.get(expense.member_id) ?? null)
-                        : null
-                    }
-                    disabled={isOptimisticId(expense.id)}
-                    onClick={() => setEditTarget(expense)}
-                  />
-                ))}
+                {/* Optimistic create/delete animates rows in and out; initial={false}
+                    keeps the list static on first paint and month switches. */}
+                <AnimatePresence initial={false} mode="popLayout">
+                  {group.expenses.map((expense) => (
+                    <motion.li
+                      key={expense.id}
+                      layout
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={reducedMotion ? { duration: 0 } : SPRING_SOFT}
+                      className="overflow-hidden"
+                    >
+                      <ExpenseRow
+                        expense={expense}
+                        categoryName={
+                          expense.category_id
+                            ? (categoryNameById.get(expense.category_id) ??
+                              null)
+                            : null
+                        }
+                        member={
+                          expense.member_id
+                            ? (memberById.get(expense.member_id) ?? null)
+                            : null
+                        }
+                        disabled={isOptimisticId(expense.id)}
+                        onClick={() => setEditTarget(expense)}
+                      />
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
               </ul>
             </Card>
           </section>
@@ -154,40 +172,39 @@ function ExpenseRow({
   const subCategory = expense.memo ? categoryName : null;
 
   return (
-    <li>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left transition-colors hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:opacity-60"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm">{title}</p>
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {subCategory ? (
-              <>
-                <span className="truncate">{subCategory}</span>
-                <span aria-hidden>·</span>
-              </>
-            ) : null}
-            <span className="inline-flex shrink-0 items-center gap-1">
-              <span
-                aria-hidden
-                className="inline-block size-1.5 rounded-full"
-                style={{
-                  backgroundColor: member
-                    ? `var(--${member.color})`
-                    : "var(--muted-foreground)",
-                }}
-              />
-              {member ? member.name : "공용"}
-            </span>
-          </p>
-        </div>
-        <span className="shrink-0 text-sm font-medium tabular-nums">
-          {formatKRW(Number(expense.amount))}
-        </span>
-      </button>
-    </li>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center gap-3 rounded-[1.25rem] px-2.5 py-2 text-left transition-[background-color,scale] duration-150 ease-out hover:bg-muted/40 active:scale-[0.98] active:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:opacity-60"
+    >
+      <CategoryIcon
+        categoryId={expense.category_id}
+        categoryName={categoryName}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-medium">{title}</p>
+        <p className="mt-0.5 flex items-center gap-2 text-[13px] text-muted-foreground">
+          {subCategory ? (
+            <span className="truncate">{subCategory}</span>
+          ) : null}
+          <span className="inline-flex shrink-0 items-center gap-1">
+            <span
+              aria-hidden
+              className="inline-block size-1.5 rounded-full"
+              style={{
+                backgroundColor: member
+                  ? `var(--${member.color})`
+                  : "var(--muted-foreground)",
+              }}
+            />
+            {member ? member.name : "공용"}
+          </span>
+        </p>
+      </div>
+      <span className="shrink-0 text-[15px] font-semibold tabular-nums">
+        {formatKRW(Number(expense.amount))}
+      </span>
+    </button>
   );
 }

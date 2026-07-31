@@ -20,6 +20,7 @@ import {
 import { ExpenseCategoryBreakdown } from "@/components/expense-category-breakdown";
 import { ExpenseComposer } from "@/components/expense-editor";
 import { ExpenseList } from "@/components/expense-list";
+import { ExpenseScopeSegments } from "@/components/expense-scope-segments";
 import { ExpenseSummaryCards } from "@/components/expense-summary-cards";
 import { Button } from "@/components/ui/button";
 import { YearMonthPicker } from "@/components/year-month-picker";
@@ -259,16 +260,17 @@ export function ExpenseView({ dashboard }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1">
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             disabled={navPending}
             onClick={() => goToMonth(prevYearMonth(dashboard.yearMonth))}
             aria-label="이전 달"
+            className="rounded-full text-muted-foreground hover:text-foreground"
           >
-            <ChevronLeft className="size-4" />
+            <ChevronLeft className="size-5" />
           </Button>
           <YearMonthPicker
             existing={monthsWithData}
@@ -280,7 +282,7 @@ export function ExpenseView({ dashboard }: Props) {
                 type="button"
                 variant="ghost"
                 disabled={navPending}
-                className="px-2 font-heading text-xl font-semibold"
+                className="px-2 font-heading text-xl font-semibold tracking-tight"
               >
                 {formatYearMonthLong(dashboard.yearMonth)}
               </Button>
@@ -289,15 +291,16 @@ export function ExpenseView({ dashboard }: Props) {
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             disabled={navPending}
             onClick={() => goToMonth(nextYearMonth(dashboard.yearMonth))}
             aria-label="다음 달"
+            className="rounded-full text-muted-foreground hover:text-foreground"
           >
-            <ChevronRight className="size-4" />
+            <ChevronRight className="size-5" />
           </Button>
         </div>
-        <span className="text-sm text-muted-foreground tabular-nums">
+        <span className="text-[13px] font-medium text-muted-foreground tabular-nums">
           {localExpenses.length}건
         </span>
       </div>
@@ -306,9 +309,15 @@ export function ExpenseView({ dashboard }: Props) {
         members={dashboard.members}
         totals={currentTotals}
         prevTotals={dashboard.prevTotals}
-        scope={effectiveScope}
-        onScopeChange={setScope}
       />
+
+      {dashboard.members.length > 0 ? (
+        <ExpenseScopeSegments
+          members={dashboard.members}
+          scope={effectiveScope}
+          onScopeChange={setScope}
+        />
+      ) : null}
 
       {scopedExpenses.length > 0 ? (
         <ExpenseCategoryBreakdown

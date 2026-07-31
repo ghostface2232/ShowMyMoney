@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 
+import { Wallet } from "lucide-react";
+
 import { signIn } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,7 +44,10 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>로그인</CardTitle>
+        <span className="mb-1 inline-flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+          <Wallet className="size-5.5" strokeWidth={2.2} aria-hidden />
+        </span>
+        <CardTitle className="text-xl tracking-tight">ShowMyMoney</CardTitle>
         <CardDescription>PIN을 입력해 계정에 접속하세요.</CardDescription>
       </CardHeader>
       <CardContent>
