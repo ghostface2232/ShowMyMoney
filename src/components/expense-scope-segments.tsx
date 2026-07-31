@@ -1,19 +1,22 @@
-// Segmented control for the expense view scope (all / per member / shared).
-// A dedicated filter control, separate from the summary cards which are display-only.
-// The active thumb slides between segments via a shared layout animation.
+// Scope filter chips for the expense view (all / per member / shared).
+// Free-floating pill chips (Apple Mail / KakaoTalk style): the active chip fills
+// with its identity color, the rest stay quiet card pills. Display data lives in
+// the summary cards above; these chips own filtering.
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
 
 import { SCOPE_ALL, SCOPE_SHARED } from "@/lib/expense-scope";
-import { SPRING_DEFAULT } from "@/lib/motion";
+import { SPRING_DEFAULT, TAP_SCALE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { Member } from "@/types/db";
 
-type Segment = {
+type Chip = {
   key: string;
   label: string;
-  dotColor?: string;
+  /** Identity fill for the active state; also the dot color when inactive. */
+  color: string;
+  showDot: boolean;
 };
 
 type Props = {
@@ -25,60 +28,56 @@ type Props = {
 export function ExpenseScopeSegments({ members, scope, onScopeChange }: Props) {
   const reducedMotion = useReducedMotion();
 
-  const segments: Segment[] = [
-    { key: SCOPE_ALL, label: "전체" },
+  const chips: Chip[] = [
+    { key: SCOPE_ALL, label: "전체", color: "var(--primary)", showDot: false },
     ...members.map((member) => ({
       key: member.id,
       label: member.name,
-      dotColor: `var(--${member.color})`,
+      color: `var(--${member.color})`,
+      showDot: true,
     })),
     {
       key: SCOPE_SHARED,
       label: "공용",
-      dotColor: "var(--muted-foreground)",
+      color: "var(--muted-foreground)",
+      showDot: true,
     },
   ];
 
   return (
     <div
-      role="tablist"
       aria-label="지출 범위 선택"
-      className="flex w-full rounded-full bg-muted/70 p-1"
+      className="flex items-center gap-1.5 overflow-x-auto px-0.5 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      {segments.map((segment) => {
-        const active = scope === segment.key;
+      {chips.map((chip) => {
+        const active = scope === chip.key;
         return (
-          <button
-            key={segment.key}
+          <motion.button
+            key={chip.key}
             type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onScopeChange(segment.key)}
+            aria-pressed={active}
+            onClick={() => onScopeChange(chip.key)}
+            whileTap={reducedMotion ? undefined : { scale: TAP_SCALE }}
+            transition={reducedMotion ? { duration: 0 } : SPRING_DEFAULT}
             className={cn(
-              "relative flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 py-2 text-[13px] font-medium",
-              "transition-[color,scale] duration-150 ease-out active:scale-[0.96]",
+              "inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px]",
+              "transition-[background-color,color,box-shadow] duration-200 ease-out",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-              active ? "text-foreground" : "text-muted-foreground",
+              active
+                ? "font-semibold text-white shadow-xs"
+                : "bg-card font-medium text-muted-foreground shadow-xs ring-1 ring-foreground/5 hover:text-foreground",
             )}
+            style={active ? { backgroundColor: chip.color } : undefined}
           >
-            {active ? (
-              <motion.span
-                aria-hidden
-                layoutId="expense-scope-thumb"
-                transition={reducedMotion ? { duration: 0 } : SPRING_DEFAULT}
-                className="absolute inset-0 rounded-full bg-card shadow-xs ring-1 ring-foreground/5"
-                style={{ willChange: "transform" }}
-              />
-            ) : null}
-            {segment.dotColor ? (
+            {chip.showDot && !active ? (
               <span
                 aria-hidden
-                className="relative inline-block size-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: segment.dotColor }}
+                className="inline-block size-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: chip.color }}
               />
             ) : null}
-            <span className="relative truncate">{segment.label}</span>
-          </button>
+            {chip.label}
+          </motion.button>
         );
       })}
     </div>
