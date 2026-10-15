@@ -71,6 +71,30 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
+// Stable, distinct identity colors for a set of series (e.g. growth-chart groups). Each
+// item prefers the palette slot its id hashes to, so adding, deleting, or reordering other
+// items doesn't recolor it; on a collision it takes the next free slot, resolved in
+// creation order so the outcome is deterministic. Colors repeat only past five items.
+export function assignIdentityColors(
+  items: { id: string; created_at: string }[],
+): Map<string, string> {
+  const ordered = [...items].sort((a, b) =>
+    a.created_at === b.created_at
+      ? a.id.localeCompare(b.id)
+      : a.created_at.localeCompare(b.created_at),
+  );
+  const result = new Map<string, string>();
+  const used = new Set<number>();
+  for (const item of ordered) {
+    if (used.size === IDENTITY_COLORS.length) used.clear();
+    let slot = hashString(item.id) % IDENTITY_COLORS.length;
+    while (used.has(slot)) slot = (slot + 1) % IDENTITY_COLORS.length;
+    used.add(slot);
+    result.set(item.id, IDENTITY_COLORS[slot]);
+  }
+  return result;
+}
+
 export function getCategoryVisual(
   id: string | null,
   name: string | null,

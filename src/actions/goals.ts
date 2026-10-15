@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAccount } from "@/lib/auth-guard";
+import { isValidDateString } from "@/lib/year-month";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { Goal } from "@/types/db";
 
@@ -106,10 +107,13 @@ function validateGoalInput(
   if (trimmed.length === 0) {
     return { ok: false, error: "라벨을 입력하세요." };
   }
-  if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
+  if (trimmed.length > 40) {
+    return { ok: false, error: "라벨은 40자 이하로 입력하세요." };
+  }
+  if (!Number.isSafeInteger(targetAmount) || targetAmount <= 0) {
     return { ok: false, error: "목표 금액은 0보다 커야 합니다." };
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+  if (!isValidDateString(targetDate)) {
     return { ok: false, error: "목표일 형식이 올바르지 않습니다." };
   }
   return { ok: true, label: trimmed };

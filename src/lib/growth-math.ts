@@ -2,15 +2,9 @@
 
 import type { CategoryGroupWithCategories } from "@/actions/categories";
 import type { SnapshotWithEntries } from "@/actions/dashboard";
+import { assignIdentityColors } from "@/lib/category-visual";
 import { formatYearMonth } from "@/lib/format";
 
-const CHART_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-];
 
 export type GrowthSeries = {
   id: string;
@@ -28,10 +22,12 @@ export function calcMultiGrowthSeries(
   ascendingSnapshots: SnapshotWithEntries[],
   groups: CategoryGroupWithCategories[],
 ): { data: GrowthPoint[]; series: GrowthSeries[] } {
-  const series: GrowthSeries[] = groups.map((group, index) => ({
+  // Identity colors (not rank): reordering groups never recolors a series.
+  const colors = assignIdentityColors(groups);
+  const series: GrowthSeries[] = groups.map((group) => ({
     id: group.id,
     name: group.name,
-    color: CHART_COLORS[index % CHART_COLORS.length],
+    color: colors.get(group.id) ?? "var(--chart-1)",
   }));
 
   if (ascendingSnapshots.length < 2 || groups.length === 0) {

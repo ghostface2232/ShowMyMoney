@@ -7,9 +7,18 @@ export function isValidYearMonth(value: number): boolean {
   return month >= 1 && month <= 12;
 }
 
+// The ledger follows Korean calendar days on both server (UTC) and client: without an
+// explicit zone, 00:00-09:00 KST on the 1st still reads as last month on the server.
+const APP_TIME_ZONE = "Asia/Seoul";
+const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 export function currentYearMonth(): number {
-  const now = new Date();
-  return now.getFullYear() * 100 + (now.getMonth() + 1);
+  return yearMonthOfDate(todayDateString());
 }
 
 export function prevYearMonth(yearMonth: number): number {
@@ -31,12 +40,10 @@ export function firstDayOf(yearMonth: number): string {
   return `${year}-${String(month).padStart(2, "0")}-01`;
 }
 
-// Returns today's local date as "YYYY-MM-DD".
+// Returns today's date in the app time zone (KST) as "YYYY-MM-DD".
 export function todayDateString(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
+  // en-CA formats as YYYY-MM-DD.
+  return dateFormatter.format(new Date());
 }
 
 // Validates that a "YYYY-MM-DD" string is a real calendar date.

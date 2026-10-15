@@ -44,11 +44,11 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <span className="mb-1 inline-flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+        <span className="mb-1 inline-flex size-12 items-center justify-center squircle-mask rounded-2xl bg-primary text-primary-foreground shadow-sm">
           <Wallet className="size-5.5" strokeWidth={2.2} aria-hidden />
         </span>
         <CardTitle className="text-xl tracking-tight">ShowMyMoney</CardTitle>
-        <CardDescription>PIN을 입력해 계정에 접속하세요.</CardDescription>
+        <CardDescription>PIN을 입력하세요.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">

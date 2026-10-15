@@ -1,7 +1,7 @@
-// Header-right "month management" trigger. Adds new months and opens delete confirmation for existing ones.
+// Header-right "month management" trigger. Adds new months and opens delete confirmation for existing ones (optimistically when the asset page is mounted).
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAssetActions } from "@/components/asset-actions";
 import { Button } from "@/components/ui/button";
 import { YearMonthPicker } from "@/components/year-month-picker";
 import { formatYearMonth } from "@/lib/format";
@@ -27,10 +28,41 @@ type Props = {
 
 export function MonthManagementButton({ snapshots }: Props) {
   const router = useRouter();
+  const getAssetActions = useAssetActions();
   const [pending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<
     { id: string; year_month: number } | null
   >(null);
+
+  // `snapshots` is the server's list, so it lags an optimistic add/delete until the
+  // refresh lands; picking the same month again then would hit the server twice. The
+  // trigger stays disabled from the pick until a newer list than the one at settle arrives.
+  const [optimisticBusy, setOptimisticBusy] = useState<{
+    settledWith: Props["snapshots"] | null;
+  } | null>(null);
+  const snapshotsRef = useRef(snapshots);
+  useEffect(() => {
+    snapshotsRef.current = snapshots;
+  }, [snapshots]);
+  if (
+    optimisticBusy?.settledWith &&
+    optimisticBusy.settledWith !== snapshots
+  ) {
+    setOptimisticBusy(null);
+  }
+  // Fallback if the refresh never brings a new list (e.g. offline).
+  useEffect(() => {
+    if (!optimisticBusy?.settledWith) return;
+    const timer = window.setTimeout(() => setOptimisticBusy(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [optimisticBusy]);
+
+  async function runOptimistic(run: () => Promise<void>) {
+    setOptimisticBusy({ settledWith: null });
+    await run();
+    setOptimisticBusy({ settledWith: snapshotsRef.current });
+  }
+  const busy = pending || optimisticBusy !== null;
   const existing = useMemo(
     () => new Set(snapshots.map((snapshot) => snapshot.year_month)),
     [snapshots],
@@ -50,6 +82,14 @@ export function MonthManagementButton({ snapshots }: Props) {
       return;
     }
 
+    // On the asset page the new column appears immediately (optimistic); otherwise
+    // fall back to a plain server round trip.
+    const assetActions = getAssetActions();
+    if (assetActions) {
+      await runOptimistic(() => assetActions.addSnapshot(yearMonth));
+      return;
+    }
+
     const result = await createSnapshot(yearMonth);
     if (!result.ok) {
       toast.error(result.error);
@@ -64,6 +104,11 @@ export function MonthManagementButton({ snapshots }: Props) {
     if (!deleteTarget) return;
     const target = deleteTarget;
     setDeleteTarget(null);
+    const assetActions = getAssetActions();
+    if (assetActions) {
+      await runOptimistic(() => assetActions.deleteSnapshot(target.id));
+      return;
+    }
     const result = await deleteSnapshot(target.id);
     if (!result.ok) {
       toast.error(result.error);
@@ -80,12 +125,14 @@ export function MonthManagementButton({ snapshots }: Props) {
         existing={existing}
         existingMode="selectable"
         onSelect={handleSelect}
-        disabled={pending}
+        title="월별 관리"
+        description="누르면 빈 달은 추가되고, 기록된 달은 삭제됩니다."
+        disabled={busy}
         trigger={
           <Button
             variant="outline"
             size="sm"
-            disabled={pending}
+            disabled={busy}
             className="min-w-26 justify-start gap-2.5 border-transparent bg-card text-foreground shadow-xs ring-1 ring-foreground/5 hover:bg-card/70 aria-expanded:bg-muted/70"
           >
             <CalendarDays className="size-4" />

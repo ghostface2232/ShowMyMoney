@@ -2,7 +2,7 @@
 // Mutations are applied optimistically by the parent view, so submit handlers are synchronous.
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { getCategoryVisual } from "@/lib/category-visual";
+import { amountDigits, formatAmountInput } from "@/lib/format";
 import { SCOPE_SHARED } from "@/lib/expense-scope";
-import { DURATION_FAST, EASE_OUT, TAP_SCALE } from "@/lib/motion";
+import { DURATION_FAST, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { Expense, ExpenseCategory, Member } from "@/types/db";
 
@@ -91,78 +92,84 @@ export function ExpenseComposer({
 
   const canSubmit = draft !== null && draftToInput(draft) !== null;
 
+  // popLayout (not "wait"): the form must mount inside the tap itself. iOS only raises the
+  // keyboard for a focus() that happens during a user gesture, so an autoFocus that fires
+  // after an exit animation leaves the field focused with no keyboard.
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {open && draft ? (
-        <motion.div
-          key="form"
-          initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
-          transition={
-            reducedMotion
-              ? { duration: 0 }
-              : { duration: DURATION_FAST, ease: EASE_OUT }
-          }
-        >
-          <Card className="gap-4 p-4 shadow-none ring-0 sm:p-5">
-            <ExpenseFields
-              draft={draft}
-              onChange={(patch) => setDraft({ ...draft, ...patch })}
-              categories={categories}
-              members={members}
-              runAction={runAction}
-              amountRef={amountRef}
-              onSubmit={submit}
-            />
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setOpen(false)}
-              >
-                닫기
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={!canSubmit}
-                onClick={submit}
-              >
-                <Plus className="size-4" />
-                추가
-              </Button>
-            </div>
-          </Card>
-        </motion.div>
-      ) : (
-        <motion.button
-          key="trigger"
-          type="button"
-          onClick={expand}
-          initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
-          whileTap={reducedMotion ? undefined : { scale: TAP_SCALE }}
-          transition={
-            reducedMotion
-              ? { duration: 0 }
-              : { duration: DURATION_FAST, ease: EASE_OUT }
-          }
-          className={cn(
-            "flex w-full cursor-pointer items-center gap-3 rounded-4xl bg-card p-3 text-left text-sm font-medium text-muted-foreground transition-colors",
-            "hover:text-foreground",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-          )}
-        >
-          <span className="inline-flex size-10 items-center justify-center rounded-full bg-primary/12 text-primary">
-            <Plus className="size-[18px]" strokeWidth={2.2} />
-          </span>
-          지출 추가
-        </motion.button>
-      )}
-    </AnimatePresence>
+    <div className="relative">
+      <AnimatePresence mode="popLayout" initial={false}>
+        {open && draft ? (
+          <motion.div
+            key="form"
+            initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+            transition={
+              reducedMotion
+                ? { duration: 0 }
+                : { duration: DURATION_FAST, ease: EASE_OUT }
+            }
+          >
+            {/* Concentric with the capsule amount field in its corner: field radius 20
+                (h-10) + 16px padding (20px on sm+). */}
+            <Card className="gap-4 rounded-[2.25rem] p-4 shadow-none ring-0 sm:rounded-[2.5rem] sm:p-5">
+              <ExpenseFields
+                draft={draft}
+                onChange={(patch) => setDraft({ ...draft, ...patch })}
+                categories={categories}
+                members={members}
+                runAction={runAction}
+                amountRef={amountRef}
+                onSubmit={submit}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOpen(false)}
+                >
+                  닫기
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!canSubmit}
+                  onClick={submit}
+                >
+                  <Plus className="size-4" />
+                  추가
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.button
+            key="trigger"
+            type="button"
+            onClick={expand}
+            initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+            transition={
+              reducedMotion
+                ? { duration: 0 }
+                : { duration: DURATION_FAST, ease: EASE_OUT }
+            }
+            className={cn(
+              "flex w-full cursor-pointer items-center gap-3 squircle rounded-4xl bg-card p-3 text-left text-sm font-medium text-muted-foreground transition-[color,scale] duration-150 ease-out active:scale-[0.97]",
+              "hover:text-foreground",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+            )}
+          >
+            <span className="inline-flex size-10 items-center justify-center rounded-full bg-primary/12 text-primary">
+              <Plus className="size-[18px]" strokeWidth={2.2} />
+            </span>
+            지출 추가
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -185,6 +192,11 @@ export function ExpenseEditDialog({
   onDelete,
   onClose,
 }: EditDialogProps) {
+  const [dirty, setDirty] = useState(false);
+  const [canSave, setCanSave] = useState(false);
+  // The ✓ in the sheet bar saves through the body, which owns the draft.
+  const saveRef = useRef<(() => void) | null>(null);
+
   return (
     <Dialog
       open={expense !== null}
@@ -192,7 +204,15 @@ export function ExpenseEditDialog({
         if (!next) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onConfirm={() => saveRef.current?.()}
+        // ✓ lights up only when an edit would actually be saved; untouched or invalid
+        // drafts leave it neutral, and closing with edits asks before discarding (HIG).
+        confirmDisabled={!(dirty && canSave)}
+        confirmLabel="저장"
+        discardGuard={dirty}
+      >
         <DialogHeader>
           <DialogTitle>지출 수정</DialogTitle>
           <DialogDescription>
@@ -209,6 +229,9 @@ export function ExpenseEditDialog({
             onSave={onSave}
             onDelete={onDelete}
             onClose={onClose}
+            onDirtyChange={setDirty}
+            onCanSaveChange={setCanSave}
+            saveRef={saveRef}
           />
         ) : null}
       </DialogContent>
@@ -224,6 +247,9 @@ function ExpenseEditBody({
   onSave,
   onDelete,
   onClose,
+  onDirtyChange,
+  onCanSaveChange,
+  saveRef,
 }: {
   expense: Expense;
   categories: ExpenseCategory[];
@@ -232,14 +258,30 @@ function ExpenseEditBody({
   onSave: (input: ExpenseInput) => void;
   onDelete: () => void;
   onClose: () => void;
+  onDirtyChange: (dirty: boolean) => void;
+  onCanSaveChange: (canSave: boolean) => void;
+  saveRef: React.RefObject<(() => void) | null>;
 }) {
-  const [draft, setDraft] = useState<Draft>({
-    amountText: String(Number(expense.amount)),
+  const [initial] = useState<Draft>(() => ({
+    amountText: String(Math.round(Number(expense.amount))),
     categoryId: expense.category_id,
     memberKey: expense.member_id ?? SCOPE_SHARED,
     spentOn: expense.spent_on,
     memo: expense.memo ?? "",
-  });
+  }));
+  const [draft, setDraft] = useState<Draft>(initial);
+
+  const dirty =
+    draft.amountText !== initial.amountText ||
+    draft.categoryId !== initial.categoryId ||
+    draft.memberKey !== initial.memberKey ||
+    draft.spentOn !== initial.spentOn ||
+    draft.memo !== initial.memo;
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
+  // A closed (or replaced) editor leaves nothing to protect.
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
 
   function save() {
     const input = draftToInput(draft);
@@ -254,6 +296,13 @@ function ExpenseEditBody({
   }
 
   const canSave = draftToInput(draft) !== null;
+  useEffect(() => {
+    onCanSaveChange(canSave);
+  }, [canSave, onCanSaveChange]);
+  // Keep the sheet bar's ✓ pointed at the latest draft.
+  useEffect(() => {
+    saveRef.current = save;
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -264,27 +313,21 @@ function ExpenseEditBody({
         members={members}
         runAction={runAction}
         onSubmit={save}
+        // On phones the edit sheet opens like a native detail sheet — without throwing the
+        // keyboard over it; the user taps the field they actually want to change.
+        autoFocusAmount={!prefersTouch()}
       />
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={remove}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="size-4" />
-          삭제
-        </Button>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-            취소
-          </Button>
-          <Button type="button" size="sm" disabled={!canSave} onClick={save}>
-            저장
-          </Button>
-        </div>
-      </div>
+      {/* Cancel/save live in the sheet bar (X / ✓); delete stays as the one in-content
+          action, a full-width destructive row like iOS detail sheets. */}
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={remove}
+        className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+      >
+        <Trash2 className="size-4" />
+        지출 삭제
+      </Button>
     </div>
   );
 }
@@ -297,6 +340,7 @@ function ExpenseFields({
   runAction,
   amountRef,
   onSubmit,
+  autoFocusAmount = true,
 }: {
   draft: Draft;
   onChange: (patch: Partial<Draft>) => void;
@@ -305,18 +349,19 @@ function ExpenseFields({
   runAction: RunExpenseAction;
   amountRef?: React.RefObject<HTMLInputElement | null>;
   onSubmit: () => void;
+  autoFocusAmount?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2">
         <Input
           ref={amountRef}
-          autoFocus
+          autoFocus={autoFocusAmount}
           inputMode="numeric"
           type="text"
-          value={draft.amountText}
+          value={formatAmountInput(draft.amountText)}
           onChange={(event) =>
-            onChange({ amountText: event.target.value.replace(/\D/g, "") })
+            onChange({ amountText: amountDigits(event.target.value) })
           }
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -324,8 +369,7 @@ function ExpenseFields({
               onSubmit();
             }
           }}
-          placeholder="금액 (원)"
-          maxLength={13}
+          placeholder="금액"
           className="h-10 flex-1 text-right text-base font-semibold tabular-nums placeholder:font-normal"
         />
         <Input
@@ -368,7 +412,7 @@ function ExpenseFields({
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-muted-foreground">
-              아직 카테고리가 없습니다.
+              카테고리가 없습니다
             </p>
             <Button
               type="button"
@@ -417,10 +461,18 @@ function ExpenseFields({
             onSubmit();
           }
         }}
-        placeholder="메모 (선택)"
+        placeholder="메모"
+        enterKeyHint="done"
         maxLength={80}
       />
     </div>
+  );
+}
+
+function prefersTouch(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches
   );
 }
 
@@ -456,7 +508,8 @@ function Chip({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+        // Taller on touch screens so a wrapped grid of chips stays comfortably tappable.
+        "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium pointer-coarse:px-3.5 pointer-coarse:py-2 pointer-coarse:text-[13px]",
         "transition-[background-color,color,border-color,scale] duration-150 ease-out active:scale-[0.96]",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         selected

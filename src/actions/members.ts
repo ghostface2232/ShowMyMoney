@@ -12,6 +12,15 @@ type Result = { ok: true } | { ok: false; error: string };
 // Color tokens cycled across member badges/charts. Maps 1:1 to the chart variables in globals.css.
 const MEMBER_COLORS = ["chart-2", "chart-4", "chart-1", "chart-5", "chart-3"];
 
+// First color no current member uses (so deleting a member never leads to two members
+// sharing a color); cycles only once all five are taken. Mirrored in the management dialog.
+function nextMemberColor(used: string[]): string {
+  return (
+    MEMBER_COLORS.find((color) => !used.includes(color)) ??
+    MEMBER_COLORS[used.length % MEMBER_COLORS.length]
+  );
+}
+
 export async function listMembers(): Promise<Member[]> {
   const accountId = await requireAccount();
   const supabase = getSupabaseAdmin();
@@ -32,18 +41,19 @@ export async function createMember(name: string): Promise<Result> {
   const accountId = await requireAccount();
   const trimmed = name.trim();
   if (trimmed.length === 0) return { ok: false, error: "이름을 입력하세요." };
+  if (trimmed.length > 40) return { ok: false, error: "이름은 40자 이하로 입력하세요." };
 
   const supabase = getSupabaseAdmin();
   const { data: existing, error: existingError } = await supabase
     .from("members")
-    .select("sort_order")
+    .select("sort_order, color")
     .eq("account_id", accountId)
     .order("sort_order", { ascending: false });
   if (existingError) return { ok: false, error: "순서를 계산하지 못했습니다." };
 
   const rows = existing ?? [];
   const nextOrder = (rows[0]?.sort_order ?? -1) + 1;
-  const color = MEMBER_COLORS[rows.length % MEMBER_COLORS.length];
+  const color = nextMemberColor(rows.map((row) => row.color));
 
   const { error } = await supabase.from("members").insert({
     account_id: accountId,
@@ -64,6 +74,7 @@ export async function renameMember(
   const accountId = await requireAccount();
   const trimmed = name.trim();
   if (trimmed.length === 0) return { ok: false, error: "이름을 입력하세요." };
+  if (trimmed.length > 40) return { ok: false, error: "이름은 40자 이하로 입력하세요." };
 
   const supabase = getSupabaseAdmin();
   if (!(await isMemberOwnedBy(supabase, accountId, memberId))) {

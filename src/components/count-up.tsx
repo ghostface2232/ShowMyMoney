@@ -1,4 +1,6 @@
 // Number count-up animation. Uses requestAnimationFrame to transition from the previous value to the new value over 300-500ms with a cubic ease-out.
+// Frames are written straight to the text node: a count-up across several summary cards would
+// otherwise cost one React render per card per frame, right when an edit is being committed.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -20,57 +22,47 @@ export function CountUp({
   className,
 }: Props) {
   const reducedMotion = useReducedMotion();
-  const [animatedValue, setAnimatedValue] = useState(value);
+  // Server-rendered/hydrated text. React never updates it afterwards; the effect owns the DOM.
+  const [initialText] = useState(() => format(Math.round(value)));
+  const nodeRef = useRef<HTMLSpanElement>(null);
   // The value currently shown on screen. Updated every frame so the animation continues seamlessly even when interrupted by a new value.
   const currentRef = useRef(value);
-  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (reducedMotion) {
-      // When motion is disabled, sync immediately instead of running rAF.
-      // If animatedValue isn't kept in sync, a stale number would remain visible right after
-      // the user turns off reducedMotion until the next value change. Calling setState with the
-      // same value lets React bail out, so no cascading render occurs.
+    const node = nodeRef.current;
+    if (!node) return;
+    const paint = (next: number) => {
+      node.textContent = format(Math.round(next));
+    };
+
+    const from = currentRef.current;
+    if (reducedMotion || from === value) {
       currentRef.current = value;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAnimatedValue(value);
+      paint(value);
       return;
     }
 
-    const from = currentRef.current;
-    if (from === value) return;
-
     const start = performance.now();
     const delta = value - from;
+    let frame = 0;
 
     const step = (now: number) => {
       const t = Math.min(1, (now - start) / durationMs);
       // cubic ease-out
       const eased = 1 - Math.pow(1 - t, 3);
-      const next = from + delta * eased;
+      const next = t < 1 ? from + delta * eased : value;
       currentRef.current = next;
-      setAnimatedValue(next);
-      if (t < 1) {
-        rafRef.current = requestAnimationFrame(step);
-      } else {
-        currentRef.current = value;
-        setAnimatedValue(value);
-        rafRef.current = null;
-      }
+      paint(next);
+      if (t < 1) frame = requestAnimationFrame(step);
     };
+    frame = requestAnimationFrame(step);
 
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(step);
-
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-    };
-  }, [value, durationMs, reducedMotion]);
+    return () => cancelAnimationFrame(frame);
+  }, [value, durationMs, reducedMotion, format]);
 
   return (
-    <span className={className}>{format(Math.round(animatedValue))}</span>
+    <span ref={nodeRef} className={className}>
+      {initialText}
+    </span>
   );
 }

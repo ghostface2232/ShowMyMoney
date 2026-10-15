@@ -104,11 +104,14 @@ async function validateInput(
   accountId: string,
   input: ExpenseInput,
 ): Promise<Result> {
-  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0) {
     return { ok: false, error: "금액은 1원 이상이어야 합니다." };
   }
   if (!isValidDateString(input.spentOn)) {
     return { ok: false, error: "날짜 형식이 올바르지 않습니다." };
+  }
+  if ((input.memo?.trim().length ?? 0) > 80) {
+    return { ok: false, error: "메모는 80자 이하로 입력하세요." };
   }
 
   const supabase = getSupabaseAdmin();

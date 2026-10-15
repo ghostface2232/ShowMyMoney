@@ -59,7 +59,9 @@
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 0.52 keeps secondary text at >= 4.5:1 (WCAG AA, as HIG requires for text <= 17pt)
+     on both the page background and cards; 0.556 measured 4.4:1 on the background. */
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -74,9 +76,10 @@
   --chart-3: oklch(0.72 0.13 75);
   --chart-4: oklch(0.62 0.14 300);
   --chart-5: oklch(0.65 0.13 20);
-  /* Semantic delta colors: asset gain / spending decrease read as positive. */
-  --positive: oklch(0.6 0.15 156);
-  --negative: oklch(0.577 0.196 25.5);
+  /* Semantic delta colors: asset gain / spending decrease read as positive. Tuned so the
+     11px delta badges keep >= 4.5:1 over their own 10% tint. */
+  --positive: oklch(0.52 0.14 156);
+  --negative: oklch(0.55 0.19 25.5);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -99,11 +102,132 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans antialiased;
+    @apply bg-background font-sans antialiased;
+  }
+  /* The document never scrolls (app shell); stop iOS from rubber-banding it when a drag
+     starts on fixed chrome. The #app-scroll container keeps its own native bounce. */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+  /* Native-app touch feel: no long-press callout or text selection on controls, and no
+     double-tap-to-zoom gesture arbitration delaying taps. */
+  button,
+  a,
+  label,
+  [role="button"] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  /* Press-in feedback waits a beat, like UIKit delaying content touches: a touch that turns
+     into a scroll releases :active before the delay ends, so rows and chips never wobble
+     while the user is just scrolling past them. Release stays immediate. */
+  :where(button, a, [role="button"]):active {
+    transition-delay: 70ms;
+  }
+  /* The floating tab bar steps aside while the on-screen keyboard is up (see ViewportSync). */
+  [data-slot="tab-bar"] {
+    transition:
+      opacity 0.2s ease-out,
+      translate 0.2s ease-out;
+  }
+  html[data-keyboard-open] [data-slot="tab-bar"] {
+    opacity: 0;
+    translate: 0 1.5rem;
+    pointer-events: none;
+  }
+  html[data-keyboard-open] [data-slot="scroll-edge-bottom"] {
+    opacity: 0;
+  }
+  html[data-keyboard-open] [data-slot="tab-bar"] * {
+    pointer-events: none;
   }
   h1,
   h2,
   h3 {
     text-wrap: balance;
+  }
+}
+
+/* Increase Contrast (prefers-contrast: more): darker secondary text and visible hairlines,
+   as HIG asks for an increased-contrast variant of the palette. */
+@media (prefers-contrast: more) {
+  :root {
+    --muted-foreground: oklch(0.4 0 0);
+    --border: oklch(0.8 0 0);
+    --input: oklch(0.8 0 0);
+  }
+}
+
+/* Reduce Transparency: glass and blurred chrome become solid surfaces. */
+@media (prefers-reduced-transparency: reduce) {
+  [data-slot="tab-bar"] > div,
+  [data-slot="scroll-edge-top"] > div {
+    background-color: var(--background);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Continuous (squircle) corners: superellipse(1.35) sits between a plain arc (1) and a full
+   squircle (2), close to iOS's continuous corner curve. `.squircle` applies it natively where
+   CSS corner-shape exists; `.squircle-mask` additionally gets an emulated clip-path from
+   SquircleCorners on engines without it (iOS Safari as of Safari 27). Never put either on
+   capsules or circles — a squircle end cap reads as a flattened pill. */
+@supports (corner-shape: superellipse(1.35)) {
+  .squircle,
+  .squircle-mask {
+    corner-shape: superellipse(1.35);
+  }
+}
+
+/* Emulated squircles (see SquircleCorners): the clip-path draws the corners, so the box
+   itself must be square or the superellipse's outer bulge would show nothing. */
+[data-squircle-emulated] {
+  border-radius: 0 !important;
+}
+
+/* Liquid Glass sheet-bar buttons (DialogHeader). Neutral glass: a faint fill with a shadow
+   that hugs the circle; no inset highlight or outline on either button. Tinted (✓ with something
+   to save): the brand fill. Disabled ✓ keeps the neutral glass and fades only the glyph,
+   as iOS does, instead of dimming the whole control. */
+.sheet-glass {
+  /* The Button primitive keeps a 1px transparent border; with padding-box clipping the
+     sheet shows through it as a white ring, so glass buttons drop it. */
+  border-width: 0;
+  background-color: oklch(0.955 0 0 / 0.9);
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.06),
+    0 2px 8px oklch(0 0 0 / 0.05);
+  transition-property: background-color, color, box-shadow, scale;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-out;
+}
+@media (hover: hover) {
+  .sheet-glass:not(:disabled):hover {
+    background-color: oklch(0.93 0 0 / 0.95);
+  }
+}
+.sheet-glass[data-tinted] {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  /* Shadow only: inset highlights and outlines read as stray inner lines on the fill. */
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.08),
+    0 6px 16px -6px color-mix(in oklab, var(--primary) 55%, transparent);
+}
+@media (hover: hover) {
+  .sheet-glass[data-tinted]:not(:disabled):hover {
+    background-color: color-mix(in oklab, var(--primary) 90%, black);
+  }
+}
+.sheet-glass:disabled {
+  color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+}
+@media (prefers-contrast: more) {
+  .sheet-glass {
+    box-shadow: inset 0 0 0 1px oklch(0 0 0 / 0.35);
   }
 }

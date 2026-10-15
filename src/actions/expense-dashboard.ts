@@ -54,12 +54,7 @@ export async function getExpenseDashboardData(
         .select("member_id, amount")
         .eq("account_id", accountId)
         .eq("year_month", prev),
-      // supabase-js has no distinct, so fetch all year_month values and dedupe.
-      // Fine at personal-ledger scale; switch to an RPC once rows reach the thousands.
-      supabase
-        .from("expenses")
-        .select("year_month")
-        .eq("account_id", accountId),
+      listExpenseYearMonths(supabase, accountId),
     ]);
 
   if (expensesResult.error) {
@@ -84,13 +79,7 @@ export async function getExpenseDashboardData(
   }>;
   const prevTotals = prevRows.length > 0 ? aggregateTotals(prevRows) : null;
 
-  const monthsWithData = [
-    ...new Set(
-      ((monthsResult.data ?? []) as Array<{ year_month: number }>).map(
-        (row) => row.year_month,
-      ),
-    ),
-  ].sort((a, b) => b - a);
+  const monthsWithData = [...new Set(monthsResult.data)].sort((a, b) => b - a);
 
   return {
     yearMonth,
@@ -100,6 +89,30 @@ export async function getExpenseDashboardData(
     prevTotals,
     monthsWithData,
   };
+}
+
+// supabase-js has no distinct, so page through every year_month value and dedupe.
+// Paging matters: PostgREST caps a response at 1,000 rows by default, which a shared
+// ledger passes within a year. Switch to an RPC once rows reach the tens of thousands.
+const MONTHS_PAGE_SIZE = 1000;
+
+async function listExpenseYearMonths(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  accountId: string,
+): Promise<{ data: number[]; error: { message: string } | null }> {
+  const months: number[] = [];
+  for (let from = 0; ; from += MONTHS_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("year_month")
+      .eq("account_id", accountId)
+      .order("year_month", { ascending: false })
+      .range(from, from + MONTHS_PAGE_SIZE - 1);
+    if (error) return { data: months, error };
+    const rows = (data ?? []) as Array<{ year_month: number }>;
+    for (const row of rows) months.push(row.year_month);
+    if (rows.length < MONTHS_PAGE_SIZE) return { data: months, error: null };
+  }
 }
 
 function aggregateTotals(

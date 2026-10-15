@@ -2,7 +2,7 @@
 // Rows still waiting for server confirmation (optimistic temp ids) are not editable.
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import type { ExpenseInput } from "@/actions/expenses";
@@ -12,6 +12,7 @@ import type { RunExpenseAction } from "@/components/expense-view";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDayLabel, formatKRW } from "@/lib/format";
 import { SPRING_SOFT } from "@/lib/motion";
+import { keyOf, type RenderKeys } from "@/lib/render-keys";
 import type { Expense, ExpenseCategory, Member } from "@/types/db";
 
 type DayGroup = {
@@ -22,6 +23,7 @@ type DayGroup = {
 
 type Props = {
   expenses: Expense[];
+  renderKeys: RenderKeys;
   categories: ExpenseCategory[];
   members: Member[];
   runAction: RunExpenseAction;
@@ -32,6 +34,7 @@ type Props = {
 
 export function ExpenseList({
   expenses,
+  renderKeys,
   categories,
   members,
   runAction,
@@ -101,7 +104,7 @@ export function ExpenseList({
                 <AnimatePresence initial={false} mode="popLayout">
                   {group.expenses.map((expense) => (
                     <motion.li
-                      key={expense.id}
+                      key={keyOf(renderKeys, expense.id)}
                       layout
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
@@ -123,7 +126,7 @@ export function ExpenseList({
                             : null
                         }
                         disabled={isOptimisticId(expense.id)}
-                        onClick={() => setEditTarget(expense)}
+                        onSelect={setEditTarget}
                       />
                     </motion.li>
                   ))}
@@ -155,18 +158,19 @@ function isOptimisticId(id: string): boolean {
   return id.startsWith("optimistic-");
 }
 
-function ExpenseRow({
+// Memoized: adding or editing one expense must not re-render every other row.
+const ExpenseRow = memo(function ExpenseRow({
   expense,
   categoryName,
   member,
   disabled,
-  onClick,
+  onSelect,
 }: {
   expense: Expense;
   categoryName: string | null;
   member: Member | null; // null = shared (or an expense whose member was deleted)
   disabled: boolean;
-  onClick: () => void;
+  onSelect: (expense: Expense) => void;
 }) {
   const title = expense.memo ?? categoryName ?? "지출";
   const subCategory = expense.memo ? categoryName : null;
@@ -174,9 +178,9 @@ function ExpenseRow({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => onSelect(expense)}
       disabled={disabled}
-      className="flex w-full items-center gap-3 rounded-[1.25rem] px-2.5 py-2 text-left transition-[background-color,scale] duration-150 ease-out hover:bg-muted/40 active:scale-[0.98] active:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:opacity-60"
+      className="flex w-full items-center gap-3 squircle rounded-[1.25rem] px-2.5 py-2 text-left transition-[background-color,scale] duration-150 ease-out hover:bg-muted/40 active:scale-[0.98] active:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:opacity-60"
     >
       <CategoryIcon
         categoryId={expense.category_id}
@@ -207,4 +211,4 @@ function ExpenseRow({
       </span>
     </button>
   );
-}
+});

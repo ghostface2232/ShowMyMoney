@@ -6,13 +6,14 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   XAxis,
   YAxis,
 } from "recharts";
 import { useReducedMotion } from "motion/react";
 
-import { formatKRWCompact } from "@/lib/format";
+import { formatKRW, formatKRWCompact } from "@/lib/format";
 import type { GrowthPoint, GrowthSeries } from "@/lib/growth-math";
 
 const BAR_INNER_GAP = 2;
@@ -30,7 +31,7 @@ export function GrowthChart({ data, series }: Props) {
 
   return (
     <div
-      role="presentation"
+      role="img"
       aria-label={buildAriaLabel(data, series)}
       className="w-full"
     >
@@ -51,7 +52,11 @@ export function GrowthChart({ data, series }: Props) {
             dataKey="label"
             tickLine={false}
             axisLine={false}
-            interval={0}
+            // "26년 10월" overlaps on a phone once there are 6+ months; the month alone
+            // fits, and Recharts drops ticks if even that gets too dense.
+            tickFormatter={shortMonthLabel}
+            interval="preserveStartEnd"
+            minTickGap={6}
             tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
           />
           <YAxis
@@ -60,7 +65,17 @@ export function GrowthChart({ data, series }: Props) {
             width={Y_AXIS_WIDTH}
             tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
             tickFormatter={formatKRWCompact}
-            domain={["auto", "auto"]}
+            // Bars must grow from zero (HIG Charts); an auto domain could start mid-range
+            // and exaggerate small differences.
+            domain={[
+              (dataMin: number) => Math.min(0, dataMin),
+              (dataMax: number) => Math.max(0, dataMax),
+            ]}
+          />
+          <ReferenceLine
+            y={0}
+            stroke="var(--muted-foreground)"
+            strokeOpacity={0.35}
           />
           {series.map((s) => (
             <Bar
@@ -79,7 +94,18 @@ export function GrowthChart({ data, series }: Props) {
   );
 }
 
+function shortMonthLabel(label: string): string {
+  return label.replace(/^\d+년\s*/, "");
+}
+
+// HIG Charts: describe what the data says with real values, not the colors.
 function buildAriaLabel(data: GrowthPoint[], series: GrowthSeries[]): string {
-  if (data.length === 0) return "표시할 월별 증식량이 없습니다.";
-  return `그룹 ${series.length}종의 최근 ${data.length}개월 순변화량 추이.`;
+  if (data.length === 0) return "표시할 월별 증감이 없습니다.";
+  const latest = data[data.length - 1];
+  const parts = series.map((s) => {
+    const value = Number(latest[s.id] ?? 0);
+    const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+    return `${s.name} ${sign}${formatKRW(Math.abs(value))}`;
+  });
+  return `그룹 ${series.length}개의 최근 ${data.length}개월 순변화량. ${latest.label} 기준 ${parts.join(", ")}.`;
 }

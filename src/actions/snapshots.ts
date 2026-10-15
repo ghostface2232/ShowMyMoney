@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAccount } from "@/lib/auth-guard";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import type { Snapshot } from "@/types/db";
+import type { Entry, Snapshot } from "@/types/db";
 
 type Result<T extends object = object> =
   | ({ ok: true } & T)
@@ -27,10 +27,33 @@ export async function listSnapshots(): Promise<Snapshot[]> {
   return (data ?? []) as Snapshot[];
 }
 
+// Sum of the most recent month's entries (the header's "current total assets"), in one
+// query so the layout can fetch it alongside everything else instead of afterwards.
+export async function getLatestTotalAssets(): Promise<number> {
+  const accountId = await requireAccount();
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from("snapshots")
+    .select("id, entries(amount)")
+    .eq("account_id", accountId)
+    .order("year_month", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("총자산을 불러오지 못했습니다.");
+  }
+  const entries = (data?.entries ?? []) as Array<{ amount: number }>;
+  return entries.reduce((sum, entry) => sum + Number(entry.amount), 0);
+}
+
 export async function createSnapshot(
   yearMonth: number,
   note?: string,
-): Promise<Result<{ snapshot: Snapshot }>> {
+): Promise<
+  Result<{ snapshot: Snapshot; entries: Entry[]; copyFailed: boolean }>
+> {
   const accountId = await requireAccount();
   if (!isValidYearMonth(yearMonth)) {
     return { ok: false, error: "년월 형식이 올바르지 않습니다." };
@@ -56,10 +79,12 @@ export async function createSnapshot(
   }
 
   const snapshot = data as Snapshot;
-  await copyEntriesFromPreviousMonth(supabase, accountId, snapshot);
+  const copy = await copyEntriesFromPreviousMonth(supabase, accountId, snapshot);
 
   revalidatePath("/");
-  return { ok: true, snapshot };
+  // The copied entries go back to the client so the optimistic column can swap its
+  // placeholder amounts for real rows without waiting for a refresh.
+  return { ok: true, snapshot, entries: copy.entries, copyFailed: copy.failed };
 }
 
 // New months start as a copy of the most recent earlier month so the user
@@ -68,8 +93,8 @@ async function copyEntriesFromPreviousMonth(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   accountId: string,
   snapshot: Snapshot,
-): Promise<void> {
-  const { data: previous } = await supabase
+): Promise<{ entries: Entry[]; failed: boolean }> {
+  const { data: previous, error: previousError } = await supabase
     .from("snapshots")
     .select("id")
     .eq("account_id", accountId)
@@ -77,21 +102,28 @@ async function copyEntriesFromPreviousMonth(
     .order("year_month", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!previous) return;
+  if (previousError) return { entries: [], failed: true };
+  if (!previous) return { entries: [], failed: false };
 
-  const { data: entries } = await supabase
+  const { data: entries, error: entriesError } = await supabase
     .from("entries")
     .select("category_id, amount")
     .eq("snapshot_id", previous.id);
-  if (!entries || entries.length === 0) return;
+  if (entriesError) return { entries: [], failed: true };
+  if (!entries || entries.length === 0) return { entries: [], failed: false };
 
-  await supabase.from("entries").insert(
-    entries.map((entry) => ({
-      snapshot_id: snapshot.id,
-      category_id: entry.category_id,
-      amount: entry.amount,
-    })),
-  );
+  const { data: inserted, error: insertError } = await supabase
+    .from("entries")
+    .insert(
+      entries.map((entry) => ({
+        snapshot_id: snapshot.id,
+        category_id: entry.category_id,
+        amount: entry.amount,
+      })),
+    )
+    .select("id, snapshot_id, category_id, amount, created_at, updated_at");
+  if (insertError) return { entries: [], failed: true };
+  return { entries: (inserted ?? []) as Entry[], failed: false };
 }
 
 export async function deleteSnapshot(snapshotId: string): Promise<Result> {

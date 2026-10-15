@@ -78,9 +78,14 @@ export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
               initial={
                 reducedMotion || hasClientNavigated()
                   ? false
-                  : { opacity: 0, y: ENTER_Y, filter: ENTER_BLUR }
+                  : {
+                      opacity: 0,
+                      transform: `translateY(${ENTER_Y}px)`,
+                      filter: ENTER_BLUR,
+                    }
               }
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              // `transform` (not `y`) keeps the stagger on the compositor via WAAPI.
+              animate={{ opacity: 1, transform: "none", filter: "blur(0px)" }}
               transition={
                 reducedMotion
                   ? { duration: 0 }
@@ -90,7 +95,6 @@ export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
                       ease: EASE_OUT,
                     }
               }
-              style={{ willChange: "transform, opacity" }}
               className={cn(
                 "relative flex min-w-0 flex-col justify-center gap-1 bg-card px-4 text-left",
                 card.fullWidthOnMobile ? "py-5" : "py-4",
@@ -140,11 +144,6 @@ export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
           );
         })}
       </Card>
-      {members.length === 0 ? (
-        <p className="px-1 text-xs text-muted-foreground">
-          헤더의 관리에서 멤버를 추가하면 사람별 지출을 나눠 볼 수 있습니다.
-        </p>
-      ) : null}
     </div>
   );
 }
