@@ -322,14 +322,15 @@ function useSheetDragToDismiss(
       sheet!.style.transition = transition
       sheet!.style.transform = ""
       setOverlayStyle("", `opacity 0.4s ${SHEET_EASE}`)
-      sheet!.addEventListener(
-        "transitionend",
-        () => {
-          if (sheet!.style.transition === transition) sheet!.style.transition = ""
-          setOverlayStyle("", "")
-        },
-        { once: true }
-      )
+      // Child transitions (a button's press scale, the glass fill) bubble up here and
+      // end sooner; only the sheet's own transform marks the end of the snap-back.
+      const onEnd = (event: TransitionEvent) => {
+        if (event.target !== sheet || event.propertyName !== "transform") return
+        sheet!.removeEventListener("transitionend", onEnd)
+        if (sheet!.style.transition === transition) sheet!.style.transition = ""
+        setOverlayStyle("", "")
+      }
+      sheet!.addEventListener("transitionend", onEnd)
     }
 
     sheet.addEventListener("touchstart", onTouchStart, { passive: true })
@@ -412,7 +413,7 @@ function DialogHeader({
       // padding out to that 16px inset.
       className="-mx-2 -mt-2 flex min-h-11 items-center gap-3"
     >
-      {confirmButton ? closeButton : spacer}
+      {confirmButton ? (closeButton ?? spacer) : spacer}
       <div
         className={cn(
           "flex min-w-0 flex-1 flex-col items-center text-center [&_[data-slot=dialog-description]]:sr-only",

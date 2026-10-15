@@ -99,8 +99,17 @@ function ProfileDialog({
     setConfirmPin("");
   }
 
+  // The sheet is opened by the parent's state, not a trigger, so onOpenChange never sees
+  // the open; reset on the open transition instead. Closing also clears the form, keeping
+  // discarded edits (and PIN digits) from surviving to the next open.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) resetForm();
+  }
+
   function handleOpenChange(next: boolean) {
-    if (next) resetForm();
+    if (!next) resetForm();
     onOpenChange(next);
   }
 

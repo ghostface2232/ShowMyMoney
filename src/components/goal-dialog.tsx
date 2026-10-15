@@ -1,7 +1,7 @@
 // Goal analysis Dialog. Shows the current total assets prominently at the top, and per-goal progress, required monthly savings, and status. Creates/edits via an inline form and confirms deletion with an AlertDialog.
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AnimatePresence,
@@ -58,7 +58,12 @@ const EMPTY_DRAFT: Draft = { label: "", amount: "", date: "" };
 
 export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [refreshing, startTransition] = useTransition();
+  // The transition only covers the refresh; `saving` covers the server call before it,
+  // so a second tap on ✓ or 저장 can't create the same goal twice.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const pending = refreshing || saving;
   const reducedMotion = useReducedMotion();
   const transition: Transition = reducedMotion ? { duration: 0 } : SPRING_SOFT;
 
@@ -120,10 +125,16 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
       return false;
     }
 
-    const result =
-      mode === "create"
-        ? await createGoal(label, amount, date)
-        : await updateGoal(goalId!, label, amount, date);
+    if (savingRef.current) return false;
+    savingRef.current = true;
+    setSaving(true);
+    const result = await (mode === "create"
+      ? createGoal(label, amount, date)
+      : updateGoal(goalId!, label, amount, date)
+    ).finally(() => {
+      savingRef.current = false;
+      setSaving(false);
+    });
 
     if (!result.ok) {
       toast.error(result.error);

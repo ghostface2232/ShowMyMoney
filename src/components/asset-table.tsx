@@ -87,7 +87,7 @@ import {
   type RenderKeys,
 } from "@/lib/render-keys";
 import { replaceEqualDeep } from "@/lib/structural-sharing";
-import { cn } from "@/lib/utils";
+import { blurFocusedInput, cn } from "@/lib/utils";
 import type { Category } from "@/types/db";
 
 type ActionResult<T extends object = object> =
@@ -161,12 +161,13 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
       });
     }
 
+    // Settles (never rejects) once the server answered and the local state was reconciled.
     function runInBackground<T extends object = object>(
       action: Promise<ActionResult<T>>,
       onSuccess?: (result: { ok: true } & T) => void,
-    ) {
+    ): Promise<void> {
       pendingBackgroundCountRef.current += 1;
-      void action
+      return action
         .then((result) => {
           if (!result.ok) {
             toast.error(result.error);
@@ -190,7 +191,7 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
         });
     }
 
-    function addSnapshot(yearMonth: number) {
+    function addSnapshot(yearMonth: number): Promise<void> {
       const tempId = createTempId("snapshot");
       const now = new Date().toISOString();
       // The server seeds a new month with the closest earlier month's amounts; mirror
@@ -225,7 +226,7 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
           (a, b) => b.year_month - a.year_month,
         ),
       }));
-      runInBackground(createSnapshot(yearMonth), (result) => {
+      return runInBackground(createSnapshot(yearMonth), (result) => {
         setRenderKeys((keys) => withAlias(keys, result.snapshot.id, tempId));
         if (result.copyFailed) {
           toast.error("이전 달 금액을 가져오지 못했습니다.");
@@ -245,17 +246,17 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
       });
     }
 
-    function deleteSnapshot(snapshotId: string) {
+    function deleteSnapshot(snapshotId: string): Promise<void> {
       // A month still waiting for its server id can't be deleted yet; the header only
       // offers months the server already knows about.
-      if (isOptimisticId(snapshotId)) return;
+      if (isOptimisticId(snapshotId)) return Promise.resolve();
       setLocalDashboard((current) => ({
         ...current,
         snapshots: current.snapshots.filter(
           (snapshot) => snapshot.id !== snapshotId,
         ),
       }));
-      runInBackground(deleteSnapshotAction(snapshotId));
+      return runInBackground(deleteSnapshotAction(snapshotId));
     }
 
     const actions: TableActions = {
@@ -828,12 +829,16 @@ function GroupManagementDialog({
     });
   }
 
+  // Every way of closing commits unfinished typing, as ✓ does. Renames already save on
+  // blur, and a swipe blurs the field, so dropping input on X alone would be inconsistent.
   function handleOpenChange(next: boolean) {
-    setOpen(next);
     if (!next) {
+      if (newCategory.trim()) addCategory();
+      blurFocusedInput();
       setEditingRows(new Set());
       setTitleEditing(false);
     }
+    setOpen(next);
   }
   const [deleteTarget, setDeleteTarget] = useState<GroupDeleteTarget | null>(
     null,
@@ -905,15 +910,9 @@ function GroupManagementDialog({
         </DialogTrigger>
         <DialogContent
           className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg"
-          // Edits here apply as they happen; ✓ commits whatever is still being typed
-          // (a new item, or a rename that saves on blur) and closes.
-          onConfirm={() => {
-            if (newCategory.trim()) addCategory();
-            if (document.activeElement instanceof HTMLElement) {
-              document.activeElement.blur();
-            }
-            handleOpenChange(false);
-          }}
+          // Edits here apply as they happen; ✓ (like any close) commits whatever is still
+          // being typed (a new item, or a rename that saves on blur).
+          onConfirm={() => handleOpenChange(false)}
           confirmDisabled={!hasPendingInput}
         >
           <DialogHeader>
@@ -1418,7 +1417,8 @@ const AmountCell = memo(function AmountCell({
             size="icon-xs"
             onMouseDown={(event) => event.preventDefault()}
             onClick={remove}
-            className="text-muted-foreground hover:text-destructive"
+            // The enlarged touch target must not cover the field's right edge.
+            className="text-muted-foreground hover:text-destructive pointer-coarse:after:left-0"
             aria-label="엔트리 삭제"
           >
             <Trash2 className="size-3.5" />

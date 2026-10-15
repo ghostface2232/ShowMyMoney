@@ -12,9 +12,10 @@ import {
   type RefObject,
 } from "react";
 
+// Each settles once the server has answered (the column itself updates immediately).
 export type AssetActionHandlers = {
-  addSnapshot: (yearMonth: number) => void;
-  deleteSnapshot: (snapshotId: string) => void;
+  addSnapshot: (yearMonth: number) => Promise<void>;
+  deleteSnapshot: (snapshotId: string) => Promise<void>;
 };
 
 const AssetActionsContext = createContext<RefObject<AssetActionHandlers | null> | null>(

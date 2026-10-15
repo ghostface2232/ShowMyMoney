@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SPRING_SOFT } from "@/lib/motion";
+import { blurFocusedInput } from "@/lib/utils";
 import {
   keyOf,
   NO_RENDER_KEYS,
@@ -172,13 +173,18 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
     });
   }
 
+  // Every way of closing commits unfinished typing, as ✓ does. Renames already save on
+  // blur, and a swipe blurs the field, so dropping input on X alone would be inconsistent.
   function handleOpenChange(next: boolean) {
-    setOpen(next);
     if (!next) {
+      if (memberDraft.trim()) addMember(memberDraft.trim());
+      if (categoryDraft.trim()) addCategory(categoryDraft.trim());
+      blurFocusedInput();
       setMemberDraft("");
       setCategoryDraft("");
       setEditingRows(new Set());
     }
+    setOpen(next);
   }
   const [, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -299,16 +305,9 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
         </DialogTrigger>
         <DialogContent
           className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg"
-          // Edits here apply as they happen; ✓ commits whatever is still being typed
-          // (new names, or renames that save on blur) and closes.
-          onConfirm={() => {
-            if (memberDraft.trim()) addMember(memberDraft.trim());
-            if (categoryDraft.trim()) addCategory(categoryDraft.trim());
-            if (document.activeElement instanceof HTMLElement) {
-              document.activeElement.blur();
-            }
-            handleOpenChange(false);
-          }}
+          // Edits here apply as they happen; ✓ (like any close) commits whatever is still
+          // being typed (new names, or renames that save on blur).
+          onConfirm={() => handleOpenChange(false)}
           confirmDisabled={!hasPendingInput}
         >
           <DialogHeader>

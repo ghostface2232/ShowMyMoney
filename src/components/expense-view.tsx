@@ -148,7 +148,10 @@ export function ExpenseView({ dashboard }: Props) {
   };
 
   function addExpense(input: ExpenseInput) {
-    if (yearMonthOfDate(input.spentOn) !== dashboard.yearMonth) {
+    // Read the month on screen now, not at render: the undo toast keeps a closure from
+    // the render that deleted the row, and the view may have moved to another month.
+    const viewMonth = lastYearMonthRef.current;
+    if (yearMonthOfDate(input.spentOn) !== viewMonth) {
       // Saved into another month: nothing to show in this view, just persist.
       runInBackground(createExpense(input));
       return;
@@ -162,7 +165,7 @@ export function ExpenseView({ dashboard }: Props) {
       member_id: input.memberId,
       amount: input.amount,
       spent_on: input.spentOn,
-      year_month: dashboard.yearMonth,
+      year_month: viewMonth,
       memo: normalizeMemo(input.memo),
       created_at: now,
       updated_at: now,
