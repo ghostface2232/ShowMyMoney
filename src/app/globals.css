@@ -190,13 +190,13 @@
 }
 
 /* Liquid Glass sheet-bar buttons (DialogHeader). Neutral glass: a faint fill with a shadow
-   that hugs the circle (no inset outline, highlight or offset halo). Tinted (✓ with something
+   that hugs the circle; no inset highlight or outline on either button. Tinted (✓ with something
    to save): the brand fill. Disabled ✓ keeps the neutral glass and fades only the glyph,
    as iOS does, instead of dimming the whole control. */
 .sheet-glass {
-  /* The Button primitive keeps a 1px transparent border with padding-box clipping; fill
-     under it too, or the sheet shows through as a 1px white ring. */
-  background-clip: border-box;
+  /* The Button primitive keeps a 1px transparent border; with padding-box clipping the
+     sheet shows through it as a white ring, so glass buttons drop it. */
+  border-width: 0;
   background-color: oklch(0.955 0 0 / 0.9);
   box-shadow:
     0 1px 2px oklch(0 0 0 / 0.06),
@@ -213,10 +213,8 @@
 .sheet-glass[data-tinted] {
   background-color: var(--primary);
   color: var(--primary-foreground);
-  /* Lit-glass treatment: a light top edge inside the fill and a soft brand-colored halo.
-     No inset outline on either button — it reads as an inner ring. */
+  /* Shadow only: inset highlights and outlines read as stray inner lines on the fill. */
   box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.35),
     0 1px 2px oklch(0 0 0 / 0.08),
     0 6px 16px -6px color-mix(in oklab, var(--primary) 55%, transparent);
 }
