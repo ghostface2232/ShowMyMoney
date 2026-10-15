@@ -1,5 +1,8 @@
-// Per-group monthly growth Dialog opened by tapping the summary card. Renders as a centered Dialog on desktop and a bottom Sheet on mobile.
+// Per-group monthly growth Dialog opened by tapping the summary card. Renders as a centered Dialog on desktop and, like every Dialog, a draggable bottom sheet on mobile.
 "use client";
+
+import { useEffect } from "react";
+import dynamic from "next/dynamic";
 
 import {
   Dialog,
@@ -8,18 +11,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { GrowthChart } from "@/components/growth-chart";
 import { formatKRW } from "@/lib/format";
 import type { GrowthPoint, GrowthSeries } from "@/lib/growth-math";
-import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
+
+// Recharts is the heaviest dependency in the app; keep it out of the initial bundle so
+// the first paint and hydration on iPhone stay fast, then warm it up once the page is idle.
+const loadGrowthChart = () =>
+  import("@/components/growth-chart").then((mod) => mod.GrowthChart);
+const GrowthChart = dynamic(loadGrowthChart, {
+  ssr: false,
+  loading: () => <div aria-hidden className="h-60 w-full" />,
+});
 
 type Props = {
   open: boolean;
@@ -38,24 +41,15 @@ export function GrowthDialog({
   data,
   series,
 }: Props) {
-  const isMobile = useMediaQuery("(max-width: 639px)");
-
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
-          side="bottom"
-          className="max-h-[90dvh] rounded-t-4xl"
-        >
-          <SheetHeader>
-            <SheetTitle>{title}</SheetTitle>
-            <SheetDescription>{subtitle}</SheetDescription>
-          </SheetHeader>
-          <Body data={data} series={series} className="px-6 pb-8" />
-        </SheetContent>
-      </Sheet>
-    );
-  }
+  useEffect(() => {
+    // Safari has no requestIdleCallback; a short delay keeps it off the startup path.
+    if ("requestIdleCallback" in window) {
+      const handle = window.requestIdleCallback(() => void loadGrowthChart());
+      return () => window.cancelIdleCallback(handle);
+    }
+    const handle = setTimeout(() => void loadGrowthChart(), 1500);
+    return () => clearTimeout(handle);
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

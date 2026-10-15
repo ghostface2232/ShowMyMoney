@@ -1,7 +1,8 @@
-// Monthly asset table. Manages per-group items via a modal and amount entry on a single screen.
+// Monthly asset table plus its optimistic state hook. Manages per-group items via a modal and amount entry on a single screen.
 "use client";
 
 import {
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -65,18 +66,15 @@ import { Input } from "@/components/ui/input";
 import { YearMonthPicker } from "@/components/year-month-picker";
 import { formatKRW, formatYearMonth } from "@/lib/format";
 import { DURATION_BASE, EASE_OUT, SPRING_SOFT } from "@/lib/motion";
+import { replaceEqualDeep } from "@/lib/structural-sharing";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types/db";
-
-type Props = {
-  dashboard: DashboardData;
-};
 
 type ActionResult<T extends object = object> =
   | ({ ok: true } & T)
   | { ok: false; error: string };
 
-type TableActions = {
+export type TableActions = {
   createGroup: (name: string) => void;
   renameGroup: (groupId: string, name: string) => void;
   deleteGroup: (groupId: string) => void;
@@ -95,11 +93,13 @@ type GroupDeleteTarget =
   | { kind: "group"; id: string; name: string; categoryCount: number }
   | { kind: "category"; id: string; name: string };
 
-export function AssetTable({ dashboard }: Props) {
+// Optimistic local mirror of the server dashboard. Owned by AssetDashboard so the summary
+// cards and the table both reflect an edit the moment it is committed. `actions` is
+// referentially stable, which lets the memoized table skip every column an edit didn't touch.
+export function useOptimisticDashboard(dashboard: DashboardData) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [localDashboard, setLocalDashboardState] = useState(dashboard);
-  const [addingGroup, setAddingGroup] = useState(false);
   const localDashboardRef = useRef(dashboard);
   const serverDashboardRef = useRef(dashboard);
   const pendingBackgroundCountRef = useRef(0);
@@ -108,291 +108,279 @@ export function AssetTable({ dashboard }: Props) {
   // Marks an optimistic entry deleted before the server confirmed it, so it is cleaned up as soon as the server ID is known.
   const cellDeletionPendingRef = useRef(new Set<string>());
 
-  const reducedMotion = useReducedMotion();
-  const transition: Transition = reducedMotion ? { duration: 0 } : SPRING_SOFT;
-
   useEffect(() => {
     serverDashboardRef.current = dashboard;
     if (pendingBackgroundCountRef.current > 0) return;
-    localDashboardRef.current = dashboard;
-    setLocalDashboardState(dashboard);
+    // Reuse unchanged groups/snapshots/entries so a refresh only re-renders what moved.
+    const next = replaceEqualDeep(localDashboardRef.current, dashboard);
+    localDashboardRef.current = next;
+    setLocalDashboardState(next);
   }, [dashboard]);
 
-  const existingYearMonths = useMemo(
-    () => new Set(localDashboard.snapshots.map((s) => s.year_month)),
-    [localDashboard.snapshots],
-  );
+  const api = useMemo(() => {
+    function setLocalDashboard(
+      update: (current: DashboardData) => DashboardData,
+    ) {
+      setLocalDashboardState((current) => {
+        const next = update(current);
+        localDashboardRef.current = next;
+        return next;
+      });
+    }
 
-  function setLocalDashboard(update: (current: DashboardData) => DashboardData) {
-    setLocalDashboardState((current) => {
-      const next = update(current);
-      localDashboardRef.current = next;
-      return next;
-    });
-  }
+    function restoreServerDashboard() {
+      const latestServer = serverDashboardRef.current;
+      localDashboardRef.current = latestServer;
+      setLocalDashboardState(latestServer);
+    }
 
-  function restoreServerDashboard() {
-    const latestServer = serverDashboardRef.current;
-    localDashboardRef.current = latestServer;
-    setLocalDashboardState(latestServer);
-  }
+    function refresh() {
+      startTransition(() => {
+        router.refresh();
+      });
+    }
 
-  function refresh() {
-    startTransition(() => {
-      router.refresh();
-    });
-  }
-
-  function runInBackground<T extends object = object>(
-    action: Promise<ActionResult<T>>,
-    onSuccess?: (result: { ok: true } & T) => void,
-  ) {
-    pendingBackgroundCountRef.current += 1;
-    void action
-      .then((result) => {
-        if (!result.ok) {
-          toast.error(result.error);
+    function runInBackground<T extends object = object>(
+      action: Promise<ActionResult<T>>,
+      onSuccess?: (result: { ok: true } & T) => void,
+    ) {
+      pendingBackgroundCountRef.current += 1;
+      void action
+        .then((result) => {
+          if (!result.ok) {
+            toast.error(result.error);
+            restoreServerDashboard();
+            refresh();
+            return;
+          }
+          onSuccess?.(result);
+          refresh();
+        })
+        .catch(() => {
+          toast.error("변경사항을 저장하지 못했습니다.");
           restoreServerDashboard();
           refresh();
-          return;
-        }
-        onSuccess?.(result);
-        refresh();
-      })
-      .catch(() => {
-        toast.error("변경사항을 저장하지 못했습니다.");
-        restoreServerDashboard();
-        refresh();
-      })
-      .finally(() => {
-        pendingBackgroundCountRef.current = Math.max(
-          0,
-          pendingBackgroundCountRef.current - 1,
-        );
-      });
-  }
+        })
+        .finally(() => {
+          pendingBackgroundCountRef.current = Math.max(
+            0,
+            pendingBackgroundCountRef.current - 1,
+          );
+        });
+    }
 
-  function addSnapshot(yearMonth: number) {
-    const tempId = createTempId("snapshot");
-    const tempSnapshot: SnapshotWithEntries = {
-      id: tempId,
-      account_id: "",
-      year_month: yearMonth,
-      note: null,
-      created_at: new Date().toISOString(),
-      entriesByCategory: {},
-    };
-
-    setLocalDashboard((current) => ({
-      ...current,
-      snapshots: [tempSnapshot, ...current.snapshots].sort(
-        (a, b) => b.year_month - a.year_month,
-      ),
-    }));
-    runInBackground(createSnapshot(yearMonth), (result) => {
-      setLocalDashboard((current) => ({
-        ...current,
-        snapshots: current.snapshots.map((snapshot) =>
-          snapshot.id === tempId
-            ? { ...result.snapshot, entriesByCategory: snapshot.entriesByCategory }
-            : snapshot,
-        ),
-      }));
-    });
-  }
-
-  const actions: TableActions = {
-    createGroup(name) {
-      const trimmed = name.trim();
-      if (!trimmed) return;
-      const tempId = createTempId("group");
-      const tempGroup: CategoryGroupWithCategories = {
+    function addSnapshot(yearMonth: number) {
+      const tempId = createTempId("snapshot");
+      const tempSnapshot: SnapshotWithEntries = {
         id: tempId,
         account_id: "",
-        name: trimmed,
-        sort_order: localDashboardRef.current.categoryTree.length,
+        year_month: yearMonth,
+        note: null,
         created_at: new Date().toISOString(),
-        categories: [],
+        entriesByCategory: {},
       };
 
       setLocalDashboard((current) => ({
         ...current,
-        categoryTree: [...current.categoryTree, tempGroup],
+        snapshots: [tempSnapshot, ...current.snapshots].sort(
+          (a, b) => b.year_month - a.year_month,
+        ),
       }));
-      runInBackground(createGroup(trimmed), (result) => {
+      runInBackground(createSnapshot(yearMonth), (result) => {
         setLocalDashboard((current) => ({
           ...current,
-          categoryTree: current.categoryTree.map((group) =>
-            group.id === tempId
-              ? { ...result.group, categories: group.categories }
-              : group,
+          snapshots: current.snapshots.map((snapshot) =>
+            snapshot.id === tempId
+              ? {
+                  ...result.snapshot,
+                  entriesByCategory: snapshot.entriesByCategory,
+                }
+              : snapshot,
           ),
         }));
       });
-    },
-    renameGroup(groupId, name) {
-      const trimmed = name.trim();
-      if (!trimmed) return;
-      setLocalDashboard((current) => ({
-        ...current,
-        categoryTree: current.categoryTree.map((group) =>
-          group.id === groupId ? { ...group, name: trimmed } : group,
-        ),
-      }));
-      runInBackground(renameGroup(groupId, trimmed));
-    },
-    deleteGroup(groupId) {
-      const group = localDashboardRef.current.categoryTree.find(
-        (item) => item.id === groupId,
-      );
-      const categoryIds = new Set(group?.categories.map((item) => item.id));
+    }
 
-      setLocalDashboard((current) => ({
-        categoryTree: current.categoryTree.filter((item) => item.id !== groupId),
-        snapshots: current.snapshots.map((snapshot) => ({
-          ...snapshot,
-          entriesByCategory: omitEntries(snapshot.entriesByCategory, categoryIds),
-        })),
-      }));
-      runInBackground(deleteGroup(groupId));
-    },
-    createCategory(groupId, name) {
-      const trimmed = name.trim();
-      if (!trimmed) return;
-      const group = localDashboardRef.current.categoryTree.find(
-        (item) => item.id === groupId,
-      );
-      if (!group) return;
-      const tempId = createTempId("category");
-      const tempCategory: Category = {
-        id: tempId,
-        group_id: groupId,
-        name: trimmed,
-        sort_order: group.categories.length,
-        created_at: new Date().toISOString(),
-      };
+    const actions: TableActions = {
+      createGroup(name) {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        const tempId = createTempId("group");
+        const tempGroup: CategoryGroupWithCategories = {
+          id: tempId,
+          account_id: "",
+          name: trimmed,
+          sort_order: localDashboardRef.current.categoryTree.length,
+          created_at: new Date().toISOString(),
+          categories: [],
+        };
 
-      setLocalDashboard((current) => ({
-        ...current,
-        categoryTree: current.categoryTree.map((item) =>
-          item.id === groupId
-            ? { ...item, categories: [...item.categories, tempCategory] }
-            : item,
-        ),
-      }));
-      runInBackground(createCategory(groupId, trimmed), (result) => {
+        setLocalDashboard((current) => ({
+          ...current,
+          categoryTree: [...current.categoryTree, tempGroup],
+        }));
+        runInBackground(createGroup(trimmed), (result) => {
+          setLocalDashboard((current) => ({
+            ...current,
+            categoryTree: current.categoryTree.map((group) =>
+              group.id === tempId
+                ? { ...result.group, categories: group.categories }
+                : group,
+            ),
+          }));
+        });
+      },
+      renameGroup(groupId, name) {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        setLocalDashboard((current) => ({
+          ...current,
+          categoryTree: current.categoryTree.map((group) =>
+            group.id === groupId ? { ...group, name: trimmed } : group,
+          ),
+        }));
+        runInBackground(renameGroup(groupId, trimmed));
+      },
+      deleteGroup(groupId) {
+        const group = localDashboardRef.current.categoryTree.find(
+          (item) => item.id === groupId,
+        );
+        const categoryIds = new Set(group?.categories.map((item) => item.id));
+
+        setLocalDashboard((current) => ({
+          categoryTree: current.categoryTree.filter(
+            (item) => item.id !== groupId,
+          ),
+          snapshots: current.snapshots.map((snapshot) => ({
+            ...snapshot,
+            entriesByCategory: omitEntries(
+              snapshot.entriesByCategory,
+              categoryIds,
+            ),
+          })),
+        }));
+        runInBackground(deleteGroup(groupId));
+      },
+      createCategory(groupId, name) {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        const group = localDashboardRef.current.categoryTree.find(
+          (item) => item.id === groupId,
+        );
+        if (!group) return;
+        const tempId = createTempId("category");
+        const tempCategory: Category = {
+          id: tempId,
+          group_id: groupId,
+          name: trimmed,
+          sort_order: group.categories.length,
+          created_at: new Date().toISOString(),
+        };
+
         setLocalDashboard((current) => ({
           ...current,
           categoryTree: current.categoryTree.map((item) =>
             item.id === groupId
-              ? {
-                  ...item,
-                  categories: item.categories.map((category) =>
-                    category.id === tempId ? result.category : category,
-                  ),
-                }
+              ? { ...item, categories: [...item.categories, tempCategory] }
               : item,
           ),
         }));
-      });
-    },
-    renameCategory(categoryId, name) {
-      const trimmed = name.trim();
-      if (!trimmed) return;
-      setLocalDashboard((current) => ({
-        ...current,
-        categoryTree: current.categoryTree.map((group) => ({
-          ...group,
-          categories: group.categories.map((category) =>
-            category.id === categoryId
-              ? { ...category, name: trimmed }
-              : category,
+        runInBackground(createCategory(groupId, trimmed), (result) => {
+          setLocalDashboard((current) => ({
+            ...current,
+            categoryTree: current.categoryTree.map((item) =>
+              item.id === groupId
+                ? {
+                    ...item,
+                    categories: item.categories.map((category) =>
+                      category.id === tempId ? result.category : category,
+                    ),
+                  }
+                : item,
+            ),
+          }));
+        });
+      },
+      renameCategory(categoryId, name) {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        setLocalDashboard((current) => ({
+          ...current,
+          // Only the owning group gets a new identity; the rest stay memo-equal.
+          categoryTree: current.categoryTree.map((group) =>
+            group.categories.some((category) => category.id === categoryId)
+              ? {
+                  ...group,
+                  categories: group.categories.map((category) =>
+                    category.id === categoryId
+                      ? { ...category, name: trimmed }
+                      : category,
+                  ),
+                }
+              : group,
           ),
-        })),
-      }));
-      runInBackground(renameCategory(categoryId, trimmed));
-    },
-    deleteCategory(categoryId) {
-      setLocalDashboard((current) => ({
-        categoryTree: current.categoryTree.map((group) => ({
-          ...group,
-          categories: group.categories.filter(
-            (category) => category.id !== categoryId,
+        }));
+        runInBackground(renameCategory(categoryId, trimmed));
+      },
+      deleteCategory(categoryId) {
+        setLocalDashboard((current) => ({
+          categoryTree: current.categoryTree.map((group) =>
+            group.categories.some((category) => category.id === categoryId)
+              ? {
+                  ...group,
+                  categories: group.categories.filter(
+                    (category) => category.id !== categoryId,
+                  ),
+                }
+              : group,
           ),
-        })),
-        snapshots: current.snapshots.map((snapshot) => ({
-          ...snapshot,
-          entriesByCategory: omitEntries(
-            snapshot.entriesByCategory,
-            new Set([categoryId]),
+          snapshots: current.snapshots.map((snapshot) =>
+            categoryId in snapshot.entriesByCategory
+              ? {
+                  ...snapshot,
+                  entriesByCategory: omitEntries(
+                    snapshot.entriesByCategory,
+                    new Set([categoryId]),
+                  ),
+                }
+              : snapshot,
           ),
-        })),
-      }));
-      runInBackground(deleteCategory(categoryId));
-    },
-    reorderCategories(groupId, orderedIds) {
-      setLocalDashboard((current) => ({
-        ...current,
-        categoryTree: current.categoryTree.map((group) => {
-          if (group.id !== groupId) return group;
-          const byId = new Map(
-            group.categories.map((category) => [category.id, category]),
-          );
-          return {
-            ...group,
-            categories: orderedIds
-              .map((id, index) => {
-                const category = byId.get(id);
-                return category ? { ...category, sort_order: index } : null;
-              })
-              .filter((category): category is Category => category !== null),
-          };
-        }),
-      }));
-      runInBackground(reorderCategories(groupId, orderedIds));
-    },
-    upsertEntry(snapshotId, categoryId, amount) {
-      const key = cellKey(snapshotId, categoryId);
-      const generation = bumpCellGeneration(cellGenerationRef.current, key);
-      cellDeletionPendingRef.current.delete(key);
+        }));
+        runInBackground(deleteCategory(categoryId));
+      },
+      reorderCategories(groupId, orderedIds) {
+        setLocalDashboard((current) => ({
+          ...current,
+          categoryTree: current.categoryTree.map((group) => {
+            if (group.id !== groupId) return group;
+            const byId = new Map(
+              group.categories.map((category) => [category.id, category]),
+            );
+            return {
+              ...group,
+              categories: orderedIds
+                .map((id, index) => {
+                  const category = byId.get(id);
+                  return category ? { ...category, sort_order: index } : null;
+                })
+                .filter((category): category is Category => category !== null),
+            };
+          }),
+        }));
+        runInBackground(reorderCategories(groupId, orderedIds));
+      },
+      upsertEntry(snapshotId, categoryId, amount) {
+        const key = cellKey(snapshotId, categoryId);
+        const generation = bumpCellGeneration(cellGenerationRef.current, key);
+        cellDeletionPendingRef.current.delete(key);
 
-      const existing =
-        localDashboardRef.current.snapshots.find(
-          (snapshot) => snapshot.id === snapshotId,
-        )?.entriesByCategory[categoryId] ?? null;
-      const optimisticId = existing?.id ?? createTempId("entry");
-      const now = new Date().toISOString();
+        const existing =
+          localDashboardRef.current.snapshots.find(
+            (snapshot) => snapshot.id === snapshotId,
+          )?.entriesByCategory[categoryId] ?? null;
+        const optimisticId = existing?.id ?? createTempId("entry");
+        const now = new Date().toISOString();
 
-      setLocalDashboard((current) => ({
-        ...current,
-        snapshots: current.snapshots.map((snapshot) =>
-          snapshot.id === snapshotId
-            ? {
-                ...snapshot,
-                entriesByCategory: {
-                  ...snapshot.entriesByCategory,
-                  [categoryId]: {
-                    id: optimisticId,
-                    snapshot_id: snapshotId,
-                    category_id: categoryId,
-                    amount,
-                    created_at: existing?.created_at ?? now,
-                    updated_at: now,
-                  },
-                },
-              }
-            : snapshot,
-        ),
-      }));
-      runInBackground(upsertEntry(snapshotId, categoryId, amount), (result) => {
-        const isStale = cellGenerationRef.current.get(key) !== generation;
-        if (isStale) {
-          if (cellDeletionPendingRef.current.has(key)) {
-            cellDeletionPendingRef.current.delete(key);
-            runInBackground(deleteEntry(result.entry.id));
-          }
-          return;
-        }
         setLocalDashboard((current) => ({
           ...current,
           snapshots: current.snapshots.map((snapshot) =>
@@ -401,56 +389,112 @@ export function AssetTable({ dashboard }: Props) {
                   ...snapshot,
                   entriesByCategory: {
                     ...snapshot.entriesByCategory,
-                    [categoryId]: result.entry,
+                    [categoryId]: {
+                      id: optimisticId,
+                      snapshot_id: snapshotId,
+                      category_id: categoryId,
+                      amount,
+                      created_at: existing?.created_at ?? now,
+                      updated_at: now,
+                    },
                   },
                 }
               : snapshot,
           ),
         }));
-      });
-    },
-    deleteEntry(entryId) {
-      const location = findEntryLocation(localDashboardRef.current, entryId);
-      if (!location) return;
-      const key = cellKey(location.snapshotId, location.categoryId);
-      bumpCellGeneration(cellGenerationRef.current, key);
+        runInBackground(upsertEntry(snapshotId, categoryId, amount), (result) => {
+          const isStale = cellGenerationRef.current.get(key) !== generation;
+          if (isStale) {
+            if (cellDeletionPendingRef.current.has(key)) {
+              cellDeletionPendingRef.current.delete(key);
+              runInBackground(deleteEntry(result.entry.id));
+            }
+            return;
+          }
+          setLocalDashboard((current) => ({
+            ...current,
+            snapshots: current.snapshots.map((snapshot) =>
+              snapshot.id === snapshotId
+                ? {
+                    ...snapshot,
+                    entriesByCategory: {
+                      ...snapshot.entriesByCategory,
+                      [categoryId]: result.entry,
+                    },
+                  }
+                : snapshot,
+            ),
+          }));
+        });
+      },
+      deleteEntry(entryId) {
+        const location = findEntryLocation(localDashboardRef.current, entryId);
+        if (!location) return;
+        const key = cellKey(location.snapshotId, location.categoryId);
+        bumpCellGeneration(cellGenerationRef.current, key);
 
-      setLocalDashboard((current) => ({
-        ...current,
-        snapshots: current.snapshots.map((snapshot) =>
-          snapshot.id === location.snapshotId
-            ? {
-                ...snapshot,
-                entriesByCategory: omitEntries(
-                  snapshot.entriesByCategory,
-                  new Set([location.categoryId]),
-                ),
-              }
-            : snapshot,
-        ),
-      }));
+        setLocalDashboard((current) => ({
+          ...current,
+          snapshots: current.snapshots.map((snapshot) =>
+            snapshot.id === location.snapshotId
+              ? {
+                  ...snapshot,
+                  entriesByCategory: omitEntries(
+                    snapshot.entriesByCategory,
+                    new Set([location.categoryId]),
+                  ),
+                }
+              : snapshot,
+          ),
+        }));
 
-      if (isOptimisticId(entryId)) {
-        cellDeletionPendingRef.current.add(key);
-        return;
-      }
-      runInBackground(deleteEntry(entryId));
-    },
-  };
+        if (isOptimisticId(entryId)) {
+          cellDeletionPendingRef.current.add(key);
+          return;
+        }
+        runInBackground(deleteEntry(entryId));
+      },
+    };
 
-  const hasSnapshots = localDashboard.snapshots.length > 0;
-  const hasGroups = localDashboard.categoryTree.length > 0;
+    return { actions, addSnapshot };
+  }, [router, startTransition]);
+
+  return { dashboard: localDashboard, ...api };
+}
+
+const INSTANT: Transition = { duration: 0 };
+
+export function AssetTable({
+  dashboard,
+  actions,
+  onAddSnapshot,
+}: {
+  dashboard: DashboardData;
+  actions: TableActions;
+  onAddSnapshot: (yearMonth: number) => void;
+}) {
+  const [addingGroup, setAddingGroup] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const transition = reducedMotion ? INSTANT : SPRING_SOFT;
+
+  const existingYearMonths = useMemo(
+    () => new Set(dashboard.snapshots.map((s) => s.year_month)),
+    [dashboard.snapshots],
+  );
+
+  const hasSnapshots = dashboard.snapshots.length > 0;
+  const hasGroups = dashboard.categoryTree.length > 0;
 
   return (
     <div className="flex flex-col gap-8 pb-8">
       {hasSnapshots ? (
         <>
           {hasGroups ? (
-            localDashboard.categoryTree.map((group) => (
+            dashboard.categoryTree.map((group) => (
               <GroupSection
                 key={group.id}
                 group={group}
-                snapshots={localDashboard.snapshots}
+                snapshots={dashboard.snapshots}
                 transition={transition}
                 actions={actions}
               />
@@ -465,7 +509,7 @@ export function AssetTable({ dashboard }: Props) {
           />
         </>
       ) : (
-        <EmptyState existing={existingYearMonths} onSelect={addSnapshot} />
+        <EmptyState existing={existingYearMonths} onSelect={onAddSnapshot} />
       )}
     </div>
   );
@@ -555,7 +599,9 @@ type GroupSectionProps = {
   actions: TableActions;
 };
 
-function GroupSection({
+// Memoized down to the cell: with stable `actions` and structurally shared data, an edit
+// re-renders only its own column, so Motion's layout measurement stays O(1) per edit.
+const GroupSection = memo(function GroupSection({
   group,
   snapshots,
   transition,
@@ -572,7 +618,7 @@ function GroupSection({
 
       <Card className="p-4 shadow-none ring-0">
         <div className="relative">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overscroll-x-contain">
             <div className="relative flex min-w-fit">
               <TableRowDividers rowCount={group.categories.length + 1} />
               <NameColumn categories={group.categories} />
@@ -604,7 +650,7 @@ function GroupSection({
       </Card>
     </section>
   );
-}
+});
 
 type NameColumnProps = {
   categories: Category[];
@@ -731,7 +777,7 @@ function GroupManagementDialog({
             <MoreHorizontal className="size-3.5" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-lg">
+        <DialogContent className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg">
           <DialogHeader className="items-start pr-10">
             <EditableDialogTitle value={group.name} onSave={saveGroupName} />
           </DialogHeader>
@@ -1046,7 +1092,7 @@ type SnapshotColumnProps = {
   isLatest: boolean;
 };
 
-function SnapshotColumn({
+const SnapshotColumn = memo(function SnapshotColumn({
   snapshot,
   categories,
   actions,
@@ -1079,7 +1125,8 @@ function SnapshotColumn({
       initial={{ opacity: 0, width: 0 }}
       animate={{ opacity: 1, width: 132 }}
       exit={{ opacity: 0, width: 0 }}
-      style={{ willChange: "transform, opacity, width" }}
+      // No permanent will-change: every column of every group would become its own
+      // composited layer, which costs iOS far more memory than the rare insert saves.
       className="z-10 flex shrink-0 flex-col overflow-hidden pl-3"
     >
       <div
@@ -1116,7 +1163,7 @@ function SnapshotColumn({
       </div>
     </motion.div>
   );
-}
+});
 
 type AmountCellProps = {
   snapshotId: string;
@@ -1125,7 +1172,7 @@ type AmountCellProps = {
   actions: TableActions;
 };
 
-function AmountCell({
+const AmountCell = memo(function AmountCell({
   snapshotId,
   categoryId,
   entry,
@@ -1214,7 +1261,7 @@ function AmountCell({
       )}
     </button>
   );
-}
+});
 
 function InlineNameInput({
   placeholder,

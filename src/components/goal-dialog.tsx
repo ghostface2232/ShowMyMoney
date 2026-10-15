@@ -151,7 +151,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
             목표 분석
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-lg">
+        <DialogContent className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>목표 분석</DialogTitle>
             <DialogDescription>

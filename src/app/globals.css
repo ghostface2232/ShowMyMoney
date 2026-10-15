@@ -99,7 +99,44 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans antialiased;
+    @apply bg-background font-sans antialiased;
+  }
+  /* The document never scrolls (app shell); stop iOS from rubber-banding it when a drag
+     starts on fixed chrome. The #app-scroll container keeps its own native bounce. */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+  /* Native-app touch feel: no long-press callout or text selection on controls, and no
+     double-tap-to-zoom gesture arbitration delaying taps. */
+  button,
+  a,
+  label,
+  [role="button"] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  /* Press-in feedback waits a beat, like UIKit delaying content touches: a touch that turns
+     into a scroll releases :active before the delay ends, so rows and chips never wobble
+     while the user is just scrolling past them. Release stays immediate. */
+  :where(button, a, [role="button"]):active {
+    transition-delay: 70ms;
+  }
+  /* The floating tab bar steps aside while the on-screen keyboard is up (see ViewportSync). */
+  [data-slot="tab-bar"] {
+    transition:
+      opacity 0.2s ease-out,
+      translate 0.2s ease-out;
+  }
+  html[data-keyboard-open] [data-slot="tab-bar"] {
+    opacity: 0;
+    translate: 0 1.5rem;
+    pointer-events: none;
+  }
+  html[data-keyboard-open] [data-slot="tab-bar"] * {
+    pointer-events: none;
   }
   h1,
   h2,

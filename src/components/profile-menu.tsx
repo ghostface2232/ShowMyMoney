@@ -150,7 +150,7 @@ function ProfileDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-md">
+        <DialogContent className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>프로필 설정</DialogTitle>
             <DialogDescription>{formatFirstUsed(firstUsedAt)}</DialogDescription>

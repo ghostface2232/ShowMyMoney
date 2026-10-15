@@ -93,14 +93,15 @@ export function ExpenseCategoryBreakdown({
                   <motion.span
                     aria-hidden
                     className="block h-full origin-left rounded-full"
-                    style={{ backgroundColor: color, willChange: "transform" }}
+                    style={{ backgroundColor: color }}
                     // Bar growth only on initial load/refresh, not when remounting on a tab switch.
+                    // A `transform` string runs on the compositor (WAAPI); `scaleX` would not.
                     initial={
                       reducedMotion || hasClientNavigated()
                         ? false
-                        : { scaleX: 0 }
+                        : { transform: "scaleX(0)" }
                     }
-                    animate={{ scaleX: sharePct / 100 }}
+                    animate={{ transform: `scaleX(${sharePct / 100})` }}
                     transition={
                       reducedMotion
                         ? { duration: 0 }

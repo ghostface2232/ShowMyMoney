@@ -116,7 +116,7 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
             지출 관리
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden sm:max-w-lg">
+        <DialogContent className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>지출 관리</DialogTitle>
             <DialogDescription>

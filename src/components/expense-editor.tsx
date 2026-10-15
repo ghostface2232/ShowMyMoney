@@ -21,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { getCategoryVisual } from "@/lib/category-visual";
 import { SCOPE_SHARED } from "@/lib/expense-scope";
-import { DURATION_FAST, EASE_OUT, TAP_SCALE } from "@/lib/motion";
+import { DURATION_FAST, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { Expense, ExpenseCategory, Member } from "@/types/db";
 
@@ -91,78 +91,82 @@ export function ExpenseComposer({
 
   const canSubmit = draft !== null && draftToInput(draft) !== null;
 
+  // popLayout (not "wait"): the form must mount inside the tap itself. iOS only raises the
+  // keyboard for a focus() that happens during a user gesture, so an autoFocus that fires
+  // after an exit animation leaves the field focused with no keyboard.
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {open && draft ? (
-        <motion.div
-          key="form"
-          initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
-          transition={
-            reducedMotion
-              ? { duration: 0 }
-              : { duration: DURATION_FAST, ease: EASE_OUT }
-          }
-        >
-          <Card className="gap-4 p-4 shadow-none ring-0 sm:p-5">
-            <ExpenseFields
-              draft={draft}
-              onChange={(patch) => setDraft({ ...draft, ...patch })}
-              categories={categories}
-              members={members}
-              runAction={runAction}
-              amountRef={amountRef}
-              onSubmit={submit}
-            />
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setOpen(false)}
-              >
-                닫기
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={!canSubmit}
-                onClick={submit}
-              >
-                <Plus className="size-4" />
-                추가
-              </Button>
-            </div>
-          </Card>
-        </motion.div>
-      ) : (
-        <motion.button
-          key="trigger"
-          type="button"
-          onClick={expand}
-          initial={reducedMotion ? false : { opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
-          whileTap={reducedMotion ? undefined : { scale: TAP_SCALE }}
-          transition={
-            reducedMotion
-              ? { duration: 0 }
-              : { duration: DURATION_FAST, ease: EASE_OUT }
-          }
-          className={cn(
-            "flex w-full cursor-pointer items-center gap-3 rounded-4xl bg-card p-3 text-left text-sm font-medium text-muted-foreground transition-colors",
-            "hover:text-foreground",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-          )}
-        >
-          <span className="inline-flex size-10 items-center justify-center rounded-full bg-primary/12 text-primary">
-            <Plus className="size-[18px]" strokeWidth={2.2} />
-          </span>
-          지출 추가
-        </motion.button>
-      )}
-    </AnimatePresence>
+    <div className="relative">
+      <AnimatePresence mode="popLayout" initial={false}>
+        {open && draft ? (
+          <motion.div
+            key="form"
+            initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+            transition={
+              reducedMotion
+                ? { duration: 0 }
+                : { duration: DURATION_FAST, ease: EASE_OUT }
+            }
+          >
+            <Card className="gap-4 p-4 shadow-none ring-0 sm:p-5">
+              <ExpenseFields
+                draft={draft}
+                onChange={(patch) => setDraft({ ...draft, ...patch })}
+                categories={categories}
+                members={members}
+                runAction={runAction}
+                amountRef={amountRef}
+                onSubmit={submit}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOpen(false)}
+                >
+                  닫기
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!canSubmit}
+                  onClick={submit}
+                >
+                  <Plus className="size-4" />
+                  추가
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.button
+            key="trigger"
+            type="button"
+            onClick={expand}
+            initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+            transition={
+              reducedMotion
+                ? { duration: 0 }
+                : { duration: DURATION_FAST, ease: EASE_OUT }
+            }
+            className={cn(
+              "flex w-full cursor-pointer items-center gap-3 rounded-4xl bg-card p-3 text-left text-sm font-medium text-muted-foreground transition-[color,scale] duration-150 ease-out active:scale-[0.97]",
+              "hover:text-foreground",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+            )}
+          >
+            <span className="inline-flex size-10 items-center justify-center rounded-full bg-primary/12 text-primary">
+              <Plus className="size-[18px]" strokeWidth={2.2} />
+            </span>
+            지출 추가
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -264,6 +268,9 @@ function ExpenseEditBody({
         members={members}
         runAction={runAction}
         onSubmit={save}
+        // On phones the edit sheet opens like a native detail sheet — without throwing the
+        // keyboard over it; the user taps the field they actually want to change.
+        autoFocusAmount={!prefersTouch()}
       />
       <div className="flex items-center justify-between gap-2">
         <Button
@@ -297,6 +304,7 @@ function ExpenseFields({
   runAction,
   amountRef,
   onSubmit,
+  autoFocusAmount = true,
 }: {
   draft: Draft;
   onChange: (patch: Partial<Draft>) => void;
@@ -305,13 +313,14 @@ function ExpenseFields({
   runAction: RunExpenseAction;
   amountRef?: React.RefObject<HTMLInputElement | null>;
   onSubmit: () => void;
+  autoFocusAmount?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-2">
         <Input
           ref={amountRef}
-          autoFocus
+          autoFocus={autoFocusAmount}
           inputMode="numeric"
           type="text"
           value={draft.amountText}
@@ -421,6 +430,13 @@ function ExpenseFields({
         maxLength={80}
       />
     </div>
+  );
+}
+
+function prefersTouch(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(pointer: coarse)").matches
   );
 }
 

@@ -15,6 +15,11 @@ export function saveScrollPosition(pathname: string): void {
   if (container) positions.set(pathname, container.scrollTop);
 }
 
+export function rememberScrollPosition(pathname: string, top: number): void {
+  // iOS reports negative offsets while rubber-banding past the top.
+  positions.set(pathname, Math.max(0, top));
+}
+
 export function getScrollPosition(pathname: string): number {
   return positions.get(pathname) ?? 0;
 }

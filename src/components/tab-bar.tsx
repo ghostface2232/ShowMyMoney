@@ -1,14 +1,13 @@
 // Floating pill-shaped bottom tab bar (iOS style) for switching between the asset and expense pages.
-// Rendered in the root layout OUTSIDE MotionShell: its animated transform/will-change would otherwise
+// Rendered in the root layout OUTSIDE MotionShell: its animated transform would otherwise
 // become the containing block for position: fixed, pinning the bar to page content instead of the viewport.
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
+import { useState } from "react";
 import { ReceiptText, Wallet, type LucideIcon } from "lucide-react";
 
-import { SPRING_DEFAULT } from "@/lib/motion";
 import { saveScrollPosition } from "@/lib/scroll-memory";
 import { cn } from "@/lib/utils";
 
@@ -25,26 +24,48 @@ const TABS: Tab[] = [
 
 const AUTH_ROUTES = ["/login", "/signup"];
 
+function tabHrefOf(pathname: string): string {
+  return pathname.startsWith("/expenses") ? "/expenses" : "/";
+}
+
 export function TabBar() {
   const pathname = usePathname();
-  const reducedMotion = useReducedMotion();
+  // The tapped tab lights up immediately instead of waiting for the route to commit.
+  // Cleared as soon as the pathname moves (or the tap turns out to be a no-op).
+  const [pending, setPending] = useState<{ href: string; from: string } | null>(
+    null,
+  );
+  if (pending && pending.from !== pathname) setPending(null);
 
   if (AUTH_ROUTES.some((route) => pathname.startsWith(route))) return null;
+
+  const activeHref = pending?.href ?? tabHrefOf(pathname);
+  const activeIndex = Math.max(
+    0,
+    TABS.findIndex((tab) => tab.href === activeHref),
+  );
 
   return (
     <nav
       aria-label="페이지 전환"
+      data-slot="tab-bar"
       className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4"
       style={{ paddingBottom: "max(env(safe-area-inset-bottom), 1rem)" }}
     >
       {/* Translucent glass: low-alpha fill + heavy backdrop blur/saturation so content
-          scrolling underneath stays visible through the bar (iOS tab bar feel). */}
-      <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-background/30 p-2 shadow-lg shadow-black/10 backdrop-blur-md backdrop-saturate-150">
+          scrolling underneath stays visible through the bar (iOS tab bar feel).
+          Equal grid columns let the indicator move with pure CSS: a compositor-driven
+          transform transition keeps gliding even while the next page mounts. */}
+      <div className="pointer-events-auto relative grid grid-cols-2 gap-1.5 rounded-full border border-border/50 bg-background/30 p-2 shadow-lg shadow-black/10 backdrop-blur-md backdrop-saturate-150">
+        <span
+          aria-hidden
+          className="absolute top-2 bottom-2 left-2 w-[calc((100%-1.375rem)/2)] rounded-full bg-primary transition-transform duration-[380ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+          style={{
+            transform: `translateX(calc(${activeIndex} * (100% + 0.375rem)))`,
+          }}
+        />
         {TABS.map((tab) => {
-          const active =
-            tab.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(tab.href);
+          const active = tab.href === activeHref;
           const Icon = tab.icon;
           return (
             <Link
@@ -56,26 +77,28 @@ export function TabBar() {
               // Scroll is handled by scroll-memory: each tab keeps its own offset
               // instead of jumping to the top on every switch.
               scroll={false}
-              onClick={() => saveScrollPosition(pathname)}
+              onClick={(event) => {
+                saveScrollPosition(pathname);
+                const plainClick =
+                  event.button === 0 &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.shiftKey &&
+                  !event.altKey;
+                if (plainClick && !active) {
+                  setPending({ href: tab.href, from: pathname });
+                }
+              }}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative flex items-center gap-2 rounded-full px-6 py-3 text-[15px] font-medium",
-                "transition-[color,scale] duration-150 ease-out active:scale-[0.96]",
+                "relative flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[15px] font-medium",
+                "transition-[color,scale] duration-200 ease-out active:scale-[0.96]",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 active
                   ? "text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {active ? (
-                <motion.span
-                  aria-hidden
-                  layoutId="tab-bar-pill"
-                  transition={reducedMotion ? { duration: 0 } : SPRING_DEFAULT}
-                  className="absolute inset-0 rounded-full bg-primary"
-                  style={{ willChange: "transform" }}
-                />
-              ) : null}
               <Icon
                 className="relative size-5.5"
                 strokeWidth={active ? 2.4 : 2}

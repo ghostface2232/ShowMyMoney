@@ -85,9 +85,14 @@ export function SummaryCards({ dashboard }: Props) {
               initial={
                 reducedMotion || hasClientNavigated()
                   ? false
-                  : { opacity: 0, y: ENTER_Y, filter: ENTER_BLUR }
+                  : {
+                      opacity: 0,
+                      transform: `translateY(${ENTER_Y}px)`,
+                      filter: ENTER_BLUR,
+                    }
               }
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              // `transform` (not `y`) keeps the stagger on the compositor via WAAPI.
+              animate={{ opacity: 1, transform: "none", filter: "blur(0px)" }}
               transition={
                 reducedMotion
                   ? { duration: 0 }
@@ -97,7 +102,6 @@ export function SummaryCards({ dashboard }: Props) {
                       ease: EASE_OUT,
                     }
               }
-              style={{ willChange: "transform, opacity" }}
               className={cn(
                 "relative flex min-w-0 cursor-pointer flex-col justify-center gap-1 bg-card px-4 text-left transition-colors",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",

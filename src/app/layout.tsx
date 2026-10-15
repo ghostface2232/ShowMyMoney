@@ -6,6 +6,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { TabBar } from "@/components/tab-bar";
 import { Toaster } from "@/components/ui/sonner";
+import { ViewportSync } from "@/components/viewport-sync";
 import { SCROLL_CONTAINER_ID } from "@/lib/scroll-memory";
 
 const sfPro = localFont({
@@ -42,6 +43,9 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Edge-to-edge: without "cover", iOS reports every env(safe-area-inset-*) as 0, so the
+  // tab bar and bottom sheets would sit on top of the home indicator.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -58,16 +62,20 @@ export default function RootLayout({
       {/* App-shell scrolling: the document itself never scrolls — all scrolling happens
           inside the container below. In Safari this keeps the toolbars from collapsing/
           expanding on scroll, so the fixed tab bar never gets pushed around; in standalone
-          (home screen) mode the behavior is identical. */}
+          (home screen) mode the behavior is identical. overscroll-contain keeps iOS's native
+          rubber-band bounce on the container without chaining into the locked document. */}
       <body className="h-full overflow-hidden bg-background text-foreground">
         <div
           id={SCROLL_CONTAINER_ID}
-          className="flex h-full flex-col overflow-y-auto overscroll-none"
+          className="flex h-full flex-col overflow-y-auto overscroll-y-contain pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]"
         >
           {children}
         </div>
         <TabBar />
-        <Toaster />
+        {/* Top-center like iOS banners: a bottom toast would land on the floating tab bar
+            or behind the keyboard. */}
+        <Toaster position="top-center" />
+        <ViewportSync />
       </body>
     </html>
   );

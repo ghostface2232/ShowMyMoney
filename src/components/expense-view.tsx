@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { YearMonthPicker } from "@/components/year-month-picker";
 import { SCOPE_ALL, SCOPE_SHARED } from "@/lib/expense-scope";
 import { formatYearMonthLong } from "@/lib/format";
+import { replaceEqualDeep } from "@/lib/structural-sharing";
 import {
   currentYearMonth,
   firstDayOf,
@@ -71,8 +72,13 @@ export function ExpenseView({ dashboard }: Props) {
     const monthChanged = lastYearMonthRef.current !== dashboard.yearMonth;
     lastYearMonthRef.current = dashboard.yearMonth;
     if (!monthChanged && pendingBackgroundCountRef.current > 0) return;
-    localExpensesRef.current = dashboard.expenses;
-    setLocalExpensesState(dashboard.expenses);
+    // Within a month, reuse unchanged rows so a background refresh re-renders nothing it
+    // doesn't have to (memoized rows compare by identity).
+    const next = monthChanged
+      ? dashboard.expenses
+      : replaceEqualDeep(localExpensesRef.current, dashboard.expenses);
+    localExpensesRef.current = next;
+    setLocalExpensesState(next);
   }, [dashboard.expenses, dashboard.yearMonth]);
 
   function applyLocal(update: (rows: Expense[]) => Expense[]) {
@@ -339,6 +345,9 @@ export function ExpenseView({ dashboard }: Props) {
           onCreate={addExpense}
         />
         <ExpenseList
+          // Remount per scope: a filter switch swaps the list instantly instead of
+          // running dozens of row exit/enter + FLIP animations at once.
+          key={effectiveScope}
           expenses={scopedExpenses}
           categories={dashboard.categories}
           members={dashboard.members}

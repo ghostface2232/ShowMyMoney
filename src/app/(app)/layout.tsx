@@ -12,6 +12,7 @@ import { listSnapshots } from "@/actions/snapshots";
 import { HeaderActions } from "@/components/header-actions";
 import { MotionShell } from "@/components/motion-shell";
 import { ProfileMenu } from "@/components/profile-menu";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { getSession } from "@/lib/session";
 
 export default async function AppLayout({
@@ -41,6 +42,7 @@ export default async function AppLayout({
 
   return (
     <>
+      <PullToRefresh />
       <header>
         <div className="mx-auto flex min-h-22 max-w-7xl items-center justify-between gap-4 px-4 pt-5 pb-3 md:min-h-24 md:px-8 md:pt-7 md:pb-4">
           <ProfileMenu
