@@ -71,10 +71,10 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
-// Stable, distinct identity colors for a set of series (e.g. growth-chart groups), handed
-// out in creation order along the palette (green, blue, amber, purple, rose). Display order
-// never matters, so reordering can't recolor a series, and the first series always gets the
-// brand-adjacent green rather than a hash landing an asset on the "negative"-looking rose.
+// Stable, distinct identity colors for a set of series (e.g. growth-chart groups). Each
+// item prefers the palette slot its id hashes to, so adding, deleting, or reordering other
+// items doesn't recolor it; on a collision it takes the next free slot, resolved in
+// creation order so the outcome is deterministic. Colors repeat only past five items.
 export function assignIdentityColors(
   items: { id: string; created_at: string }[],
 ): Map<string, string> {
@@ -83,12 +83,16 @@ export function assignIdentityColors(
       ? a.id.localeCompare(b.id)
       : a.created_at.localeCompare(b.created_at),
   );
-  return new Map(
-    ordered.map((item, index) => [
-      item.id,
-      IDENTITY_COLORS[index % IDENTITY_COLORS.length],
-    ]),
-  );
+  const result = new Map<string, string>();
+  const used = new Set<number>();
+  for (const item of ordered) {
+    if (used.size === IDENTITY_COLORS.length) used.clear();
+    let slot = hashString(item.id) % IDENTITY_COLORS.length;
+    while (used.has(slot)) slot = (slot + 1) % IDENTITY_COLORS.length;
+    used.add(slot);
+    result.set(item.id, IDENTITY_COLORS[slot]);
+  }
+  return result;
 }
 
 export function getCategoryVisual(
