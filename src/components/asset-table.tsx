@@ -809,6 +809,32 @@ function GroupManagementDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [newCategory, setNewCategory] = useState("");
+  // Fields still being typed in. Edits here apply on their own (renames save on blur), so
+  // the sheet's ✓ only lights up while one of these holds unfinished input.
+  const [editingRows, setEditingRows] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [titleEditing, setTitleEditing] = useState(false);
+  const hasPendingInput =
+    newCategory.trim() !== "" || editingRows.size > 0 || titleEditing;
+
+  function markRowEditing(categoryId: string, editing: boolean) {
+    setEditingRows((current) => {
+      if (current.has(categoryId) === editing) return current;
+      const next = new Set(current);
+      if (editing) next.add(categoryId);
+      else next.delete(categoryId);
+      return next;
+    });
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setEditingRows(new Set());
+      setTitleEditing(false);
+    }
+  }
   const [deleteTarget, setDeleteTarget] = useState<GroupDeleteTarget | null>(
     null,
   );
@@ -853,7 +879,7 @@ function GroupManagementDialog({
     setDeleteTarget(null);
 
     if (target.kind === "group") {
-      setOpen(false);
+      handleOpenChange(false);
       actions.deleteGroup(target.id);
       return;
     }
@@ -863,7 +889,7 @@ function GroupManagementDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <Button
             type="button"
@@ -879,17 +905,23 @@ function GroupManagementDialog({
         </DialogTrigger>
         <DialogContent
           className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg"
-          // Edits here apply as they happen; ✓ commits a field still being typed in
-          // (renames save on blur) and closes.
+          // Edits here apply as they happen; ✓ commits whatever is still being typed
+          // (a new item, or a rename that saves on blur) and closes.
           onConfirm={() => {
+            if (newCategory.trim()) addCategory();
             if (document.activeElement instanceof HTMLElement) {
               document.activeElement.blur();
             }
-            setOpen(false);
+            handleOpenChange(false);
           }}
+          confirmDisabled={!hasPendingInput}
         >
           <DialogHeader>
-            <EditableDialogTitle value={group.name} onSave={saveGroupName} />
+            <EditableDialogTitle
+              value={group.name}
+              onSave={saveGroupName}
+              onPendingChange={setTitleEditing}
+            />
             <DialogDescription className="sr-only">
               그룹 이름과 항목, 항목 순서를 관리합니다.
             </DialogDescription>
@@ -934,6 +966,9 @@ function GroupManagementDialog({
                         }
                         onMove={(direction) =>
                           moveCategory(category.id, direction)
+                        }
+                        onPendingChange={(pending) =>
+                          markRowEditing(category.id, pending)
                         }
                         onDelete={() =>
                           setDeleteTarget({
@@ -1042,6 +1077,7 @@ function GroupCategoryRow({
   onRename,
   onMove,
   onDelete,
+  onPendingChange,
 }: {
   category: Category;
   locked: boolean;
@@ -1051,8 +1087,10 @@ function GroupCategoryRow({
   onRename: (name: string) => void;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
+  onPendingChange: (pending: boolean) => void;
 }) {
   function commit(value: string) {
+    onPendingChange(false);
     const trimmed = value.trim();
     if (!trimmed) {
       return;
@@ -1073,9 +1111,14 @@ function GroupCategoryRow({
         key={category.name}
         disabled={locked}
         defaultValue={category.name}
+        onChange={(event) => {
+          const trimmed = event.target.value.trim();
+          onPendingChange(trimmed !== "" && trimmed !== category.name);
+        }}
         onBlur={(event) => {
           if (!event.currentTarget.value.trim()) {
             event.currentTarget.value = category.name;
+            onPendingChange(false);
             return;
           }
           commit(event.currentTarget.value);
@@ -1131,9 +1174,11 @@ function GroupCategoryRow({
 function EditableDialogTitle({
   value,
   onSave,
+  onPendingChange,
 }: {
   value: string;
   onSave: (value: string) => void;
+  onPendingChange: (pending: boolean) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
@@ -1147,6 +1192,7 @@ function EditableDialogTitle({
     const trimmed = draft.trim();
     setEditing(false);
     setDraft("");
+    onPendingChange(false);
     if (!trimmed || trimmed === value) return;
     onSave(trimmed);
   }
@@ -1154,6 +1200,7 @@ function EditableDialogTitle({
   function cancel() {
     setEditing(false);
     setDraft("");
+    onPendingChange(false);
   }
 
   if (editing) {
@@ -1165,7 +1212,11 @@ function EditableDialogTitle({
         <input
           autoFocus
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            const trimmed = event.target.value.trim();
+            onPendingChange(trimmed !== "" && trimmed !== value);
+          }}
           onBlur={commit}
           onKeyDown={(event) => {
             if (event.key === "Enter") {

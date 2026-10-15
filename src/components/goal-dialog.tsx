@@ -134,7 +134,24 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
     return true;
   }
 
-  // Sheet bar ✓: commits an open goal form (staying open if it's invalid), then closes.
+  // The open goal form (if any) drives the sheet bar: ✓ is live only for a complete,
+  // changed draft, and closing with a touched draft asks before discarding.
+  const editingGoal = editingId
+    ? goals.find((goal) => goal.id === editingId)
+    : undefined;
+  const formOpen = creating || editingGoal !== undefined;
+  const formDirty = creating
+    ? draft.label.trim() !== "" || draft.amount !== "" || draft.date !== ""
+    : editingGoal !== undefined &&
+      (draft.label.trim() !== editingGoal.label ||
+        draft.amount !== String(editingGoal.target_amount) ||
+        draft.date !== editingGoal.target_date);
+  const formValid =
+    draft.label.trim() !== "" &&
+    Number(draft.amount) > 0 &&
+    /^\d{4}-\d{2}-\d{2}$/.test(draft.date);
+
+  // Sheet bar ✓: commits the open goal form (staying open if it's invalid), then closes.
   async function confirm() {
     if (creating && !(await submit("create"))) return;
     if (editingId && !(await submit("update", editingId))) return;
@@ -177,7 +194,8 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
         <DialogContent
           className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg"
           onConfirm={() => void confirm()}
-          confirmDisabled={pending}
+          confirmDisabled={pending || !(formOpen && formDirty && formValid)}
+          discardGuard={formOpen && formDirty}
         >
           <DialogHeader>
             <DialogTitle>목표 분석</DialogTitle>

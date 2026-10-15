@@ -4,6 +4,16 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
@@ -39,6 +49,7 @@ type DialogBar = {
   onConfirm?: () => void
   confirmDisabled: boolean
   confirmLabel: string
+  requestClose: () => void
 }
 const DialogBarContext = React.createContext<DialogBar | null>(null)
 
@@ -73,21 +84,43 @@ function DialogContent({
   onConfirm,
   confirmDisabled = false,
   confirmLabel = "완료",
+  discardGuard = false,
   onOpenAutoFocus,
+  onEscapeKeyDown,
+  onPointerDownOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
-  // Sheets with input get the iOS bar pair: Cancel (X) on the leading edge and a tinted
-  // confirm (✓) on the trailing edge. Without it, the sheet only shows a trailing X.
+  // Sheets with input get the iOS bar pair: Cancel (X) on the leading edge and a confirm
+  // (✓) on the trailing edge. Without it, the sheet only shows a trailing X.
   onConfirm?: () => void
+  // Disable ✓ whenever there is nothing (valid) to save: it then turns into neutral glass,
+  // so the tint alone tells people whether ✓ will save something.
   confirmDisabled?: boolean
   confirmLabel?: string
+  // Unsaved edits: closing by X, swipe, Escape or an outside tap asks before discarding.
+  discardGuard?: boolean
 }) {
   const [sheet, setSheet] = React.useState<HTMLDivElement | null>(null)
+  const [discardOpen, setDiscardOpen] = React.useState(false)
   const overlayRef = React.useRef<HTMLDivElement>(null)
   const closeRef = React.useRef<HTMLButtonElement>(null)
 
-  useSheetDragToDismiss(sheet, overlayRef, closeRef)
+  // Every dismissal path funnels through here so the discard question is asked once,
+  // the same way, whichever gesture started it.
+  const requestClose = React.useCallback(() => {
+    if (discardGuard) {
+      setDiscardOpen(true)
+      return
+    }
+    closeRef.current?.click()
+  }, [discardGuard])
+  const requestCloseRef = React.useRef(requestClose)
+  React.useEffect(() => {
+    requestCloseRef.current = requestClose
+  }, [requestClose])
+
+  useSheetDragToDismiss(sheet, overlayRef, requestCloseRef)
 
   return (
     <DialogPortal>
@@ -95,6 +128,20 @@ function DialogContent({
       <DialogPrimitive.Content
         ref={setSheet}
         data-slot="dialog-content"
+        onEscapeKeyDown={(event) => {
+          onEscapeKeyDown?.(event)
+          if (!event.defaultPrevented && discardGuard) {
+            event.preventDefault()
+            setDiscardOpen(true)
+          }
+        }}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          if (!event.defaultPrevented && discardGuard) {
+            event.preventDefault()
+            setDiscardOpen(true)
+          }
+        }}
         onOpenAutoFocus={(event) => {
           onOpenAutoFocus?.(event)
           if (event.defaultPrevented) return
@@ -125,11 +172,17 @@ function DialogContent({
           className="pointer-events-none absolute top-2.5 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full bg-muted-foreground/25 sm:hidden"
         />
         <DialogBarContext.Provider
-          value={{ showCloseButton, onConfirm, confirmDisabled, confirmLabel }}
+          value={{
+            showCloseButton,
+            onConfirm,
+            confirmDisabled,
+            confirmLabel,
+            requestClose,
+          }}
         >
           {children}
         </DialogBarContext.Provider>
-        {/* Programmatic close target for the drag-to-dismiss gesture. */}
+        {/* Programmatic close target used once a dismissal is allowed. */}
         <DialogPrimitive.Close
           ref={closeRef}
           tabIndex={-1}
@@ -137,6 +190,26 @@ function DialogContent({
           className="sr-only"
         />
       </DialogPrimitive.Content>
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>변경사항을 버릴까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              수정한 내용은 저장되지 않습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>계속 편집</AlertDialogCancel>
+            {/* Destructive style: discarding is not what the person set out to do. */}
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => closeRef.current?.click()}
+            >
+              버리기
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DialogPortal>
   )
 }
@@ -148,7 +221,7 @@ function DialogContent({
 function useSheetDragToDismiss(
   sheet: HTMLDivElement | null,
   overlayRef: React.RefObject<HTMLDivElement | null>,
-  closeRef: React.RefObject<HTMLButtonElement | null>
+  dismissRef: React.RefObject<() => void>
 ) {
   React.useEffect(() => {
     if (!sheet) return
@@ -232,7 +305,7 @@ function useSheetDragToDismiss(
         // The exit keyframes only define their end state, so the slide-out continues
         // from the inline transform/opacity left here — no jump back to the top.
         sheet!.style.transition = ""
-        closeRef.current?.click()
+        dismissRef.current()
         // The owner may refuse to close (e.g. to confirm discarding unsaved edits);
         // then the sheet springs back instead of staying where the finger left it.
         requestAnimationFrame(() => {
@@ -269,7 +342,7 @@ function useSheetDragToDismiss(
       sheet.removeEventListener("touchend", onTouchEnd)
       sheet.removeEventListener("touchcancel", onTouchEnd)
     }
-  }, [sheet, overlayRef, closeRef])
+  }, [sheet, overlayRef, dismissRef])
 }
 
 // A pull may drag the sheet only if every scrollable box under the finger is already at
@@ -297,24 +370,30 @@ function DialogHeader({
   ...props
 }: React.ComponentProps<"div">) {
   const bar = React.useContext(DialogBarContext)
+  // Liquid Glass bar buttons (iOS 26/27): X is always neutral glass; ✓ is tinted only
+  // while there is something to save, and otherwise reads as the same neutral glass with a
+  // faded glyph — the color itself answers "will this save or just close?".
   const closeButton = bar?.showCloseButton ? (
-    <DialogPrimitive.Close data-slot="dialog-close" asChild>
-      <Button
-        variant="ghost"
-        size="icon-lg"
-        className="size-11 bg-secondary hover:bg-secondary/80"
-      >
-        <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-[18px]" />
-        <span className="sr-only">{bar.onConfirm ? "취소" : "닫기"}</span>
-      </Button>
-    </DialogPrimitive.Close>
+    <Button
+      type="button"
+      data-slot="dialog-close"
+      variant="ghost"
+      size="icon-lg"
+      className="sheet-glass size-11 text-foreground"
+      onClick={bar.requestClose}
+    >
+      <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-[18px]" />
+      <span className="sr-only">{bar.onConfirm ? "취소" : "닫기"}</span>
+    </Button>
   ) : null
   const confirmButton = bar?.onConfirm ? (
     <Button
       type="button"
       data-slot="dialog-confirm"
+      variant="ghost"
       size="icon-lg"
-      className="size-11"
+      data-tinted={bar.confirmDisabled ? undefined : ""}
+      className="sheet-glass size-11 text-foreground disabled:opacity-100"
       disabled={bar.confirmDisabled}
       onClick={bar.onConfirm}
       aria-label={bar.confirmLabel}

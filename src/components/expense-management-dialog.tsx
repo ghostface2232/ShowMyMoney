@@ -150,6 +150,36 @@ function reorderById<T extends { id: string }>(items: T[], ids: string[]): T[] {
 export function ExpenseManagementDialog({ members, categories }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  // Unfinished input (add fields, renames being typed). Edits here apply on their own, so
+  // the sheet's ✓ only lights up while something is still being typed.
+  const [memberDraft, setMemberDraft] = useState("");
+  const [categoryDraft, setCategoryDraft] = useState("");
+  const [editingRows, setEditingRows] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const hasPendingInput =
+    memberDraft.trim() !== "" ||
+    categoryDraft.trim() !== "" ||
+    editingRows.size > 0;
+
+  function markRowEditing(id: string, editing: boolean) {
+    setEditingRows((current) => {
+      if (current.has(id) === editing) return current;
+      const next = new Set(current);
+      if (editing) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setMemberDraft("");
+      setCategoryDraft("");
+      setEditingRows(new Set());
+    }
+  }
   const [, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const reducedMotion = useReducedMotion();
@@ -256,7 +286,7 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <Button
             variant="outline"
@@ -269,14 +299,17 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
         </DialogTrigger>
         <DialogContent
           className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg"
-          // Edits here apply as they happen; ✓ commits a field still being typed in
-          // (renames save on blur) and closes.
+          // Edits here apply as they happen; ✓ commits whatever is still being typed
+          // (new names, or renames that save on blur) and closes.
           onConfirm={() => {
+            if (memberDraft.trim()) addMember(memberDraft.trim());
+            if (categoryDraft.trim()) addCategory(categoryDraft.trim());
             if (document.activeElement instanceof HTMLElement) {
               document.activeElement.blur();
             }
-            setOpen(false);
+            handleOpenChange(false);
           }}
+          confirmDisabled={!hasPendingInput}
         >
           <DialogHeader>
             <DialogTitle>지출 관리</DialogTitle>
@@ -296,6 +329,8 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
               emptyMessage="멤버가 없습니다"
               addPlaceholder="새 멤버 이름"
               transition={transition}
+              draft={memberDraft}
+              onDraftChange={setMemberDraft}
               onAdd={addMember}
             >
               <AnimatePresence initial={false}>
@@ -303,6 +338,9 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
                   <ManagementRow
                     key={keyOf(memberList.renderKeys, member.id)}
                     name={member.name}
+                    onPendingChange={(pending) =>
+                      markRowEditing(member.id, pending)
+                    }
                     leading={
                       <span
                         aria-hidden
@@ -357,6 +395,8 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
               emptyMessage="카테고리가 없습니다"
               addPlaceholder="새 카테고리 이름"
               transition={transition}
+              draft={categoryDraft}
+              onDraftChange={setCategoryDraft}
               onAdd={addCategory}
               emptyExtra={
                 <Button
@@ -375,6 +415,9 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
                   <ManagementRow
                     key={keyOf(categoryList.renderKeys, category.id)}
                     name={category.name}
+                    onPendingChange={(pending) =>
+                      markRowEditing(category.id, pending)
+                    }
                     disabled={isTempId(category.id)}
                     canMoveUp={index > 0 && !categoriesSaving}
                     canMoveDown={
@@ -460,6 +503,8 @@ function ManagementSection({
   emptyExtra,
   addPlaceholder,
   transition,
+  draft,
+  onDraftChange,
   onAdd,
   children,
 }: {
@@ -469,15 +514,15 @@ function ManagementSection({
   emptyExtra?: ReactNode;
   addPlaceholder: string;
   transition: Transition;
+  draft: string;
+  onDraftChange: (draft: string) => void;
   onAdd: (name: string) => void;
   children: ReactNode;
 }) {
-  const [draft, setDraft] = useState("");
-
   function add() {
     const trimmed = draft.trim();
     if (!trimmed) return;
-    setDraft("");
+    onDraftChange("");
     onAdd(trimmed);
   }
 
@@ -509,7 +554,7 @@ function ManagementSection({
       <div className="flex items-center gap-2 pt-1">
         <Input
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
@@ -546,6 +591,7 @@ function ManagementRow({
   onRename,
   onMove,
   onDelete,
+  onPendingChange,
 }: {
   name: string;
   leading?: ReactNode;
@@ -556,8 +602,10 @@ function ManagementRow({
   onRename: (name: string) => void;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
+  onPendingChange: (pending: boolean) => void;
 }) {
   function commit(value: string) {
+    onPendingChange(false);
     const trimmed = value.trim();
     if (!trimmed) return;
     if (trimmed !== name) onRename(trimmed);
@@ -576,9 +624,14 @@ function ManagementRow({
       <Input
         key={name}
         defaultValue={name}
+        onChange={(event) => {
+          const trimmed = event.target.value.trim();
+          onPendingChange(trimmed !== "" && trimmed !== name);
+        }}
         onBlur={(event) => {
           if (!event.currentTarget.value.trim()) {
             event.currentTarget.value = name;
+            onPendingChange(false);
             return;
           }
           commit(event.currentTarget.value);

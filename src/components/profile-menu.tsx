@@ -150,8 +150,6 @@ function ProfileDialog({
   // Sheet bar ✓: saves whatever was changed (name, and the PIN once all three fields are
   // filled), then closes. A partly filled PIN form is reported instead of ignored.
   async function confirm() {
-    const pinTouched =
-      oldPin.length > 0 || newPin.length > 0 || confirmPin.length > 0;
     if (pinTouched && !pinReady) {
       toast.error("PIN을 바꾸려면 세 칸을 모두 입력하세요.");
       return;
@@ -164,6 +162,10 @@ function ProfileDialog({
   const nameDirty = name.trim().length > 0 && name.trim() !== displayName;
   const pinReady =
     oldPin.length > 0 && newPin.length > 0 && confirmPin.length > 0;
+  const pinTouched =
+    oldPin.length > 0 || newPin.length > 0 || confirmPin.length > 0;
+  const hasChanges = nameDirty || pinTouched;
+  const saving = nameSaving || pinSaving;
 
   return (
     <>
@@ -171,7 +173,8 @@ function ProfileDialog({
         <DialogContent
           className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-md"
           onConfirm={() => void confirm()}
-          confirmDisabled={nameSaving || pinSaving}
+          confirmDisabled={saving || !hasChanges}
+          discardGuard={hasChanges && !saving}
         >
           <DialogHeader>
             <DialogTitle>프로필 설정</DialogTitle>

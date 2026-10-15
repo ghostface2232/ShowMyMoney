@@ -9,16 +9,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { seedDefaultExpenseCategories } from "@/actions/expense-categories";
 import type { ExpenseInput } from "@/actions/expenses";
 import type { RunExpenseAction } from "@/components/expense-view";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -204,81 +194,48 @@ export function ExpenseEditDialog({
 }: EditDialogProps) {
   const [dirty, setDirty] = useState(false);
   const [canSave, setCanSave] = useState(false);
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
   // The ✓ in the sheet bar saves through the body, which owns the draft.
   const saveRef = useRef<(() => void) | null>(null);
 
-  // HIG (sheets): dismissing with unsaved changes — by swipe, tap outside, or Cancel —
-  // asks before throwing the edits away.
-  function requestClose() {
-    if (dirty) {
-      setConfirmDiscard(true);
-      return;
-    }
-    onClose();
-  }
-
   return (
-    <>
-      <Dialog
-        open={expense !== null}
-        onOpenChange={(next) => {
-          if (!next) requestClose();
-        }}
+    <Dialog
+      open={expense !== null}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent
+        className="sm:max-w-md"
+        onConfirm={() => saveRef.current?.()}
+        // ✓ lights up only when an edit would actually be saved; untouched or invalid
+        // drafts leave it neutral, and closing with edits asks before discarding (HIG).
+        confirmDisabled={!(dirty && canSave)}
+        confirmLabel="저장"
+        discardGuard={dirty}
       >
-        <DialogContent
-          className="sm:max-w-md"
-          onConfirm={() => saveRef.current?.()}
-          confirmDisabled={!canSave}
-          confirmLabel="저장"
-        >
-          <DialogHeader>
-            <DialogTitle>지출 수정</DialogTitle>
-            <DialogDescription>
-              금액, 분류, 누가 쓴 지출인지 수정할 수 있습니다.
-            </DialogDescription>
-          </DialogHeader>
-          {expense ? (
-            <ExpenseEditBody
-              key={expense.id}
-              expense={expense}
-              categories={categories}
-              members={members}
-              runAction={runAction}
-              onSave={onSave}
-              onDelete={onDelete}
-              onClose={onClose}
-              onDirtyChange={setDirty}
-              onCanSaveChange={setCanSave}
-              saveRef={saveRef}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>변경사항을 버릴까요?</AlertDialogTitle>
-            <AlertDialogDescription>
-              수정한 내용은 저장되지 않습니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>계속 편집</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                setDirty(false);
-                onClose();
-              }}
-            >
-              버리기
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+        <DialogHeader>
+          <DialogTitle>지출 수정</DialogTitle>
+          <DialogDescription>
+            금액, 분류, 누가 쓴 지출인지 수정할 수 있습니다.
+          </DialogDescription>
+        </DialogHeader>
+        {expense ? (
+          <ExpenseEditBody
+            key={expense.id}
+            expense={expense}
+            categories={categories}
+            members={members}
+            runAction={runAction}
+            onSave={onSave}
+            onDelete={onDelete}
+            onClose={onClose}
+            onDirtyChange={setDirty}
+            onCanSaveChange={setCanSave}
+            saveRef={saveRef}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
