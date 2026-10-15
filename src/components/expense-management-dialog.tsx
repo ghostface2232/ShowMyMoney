@@ -1,7 +1,13 @@
 // "관리" trigger in the expense header. Manages members and expense categories in one dialog.
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   AnimatePresence,
@@ -46,6 +52,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SPRING_SOFT } from "@/lib/motion";
+import {
+  keyOf,
+  NO_RENDER_KEYS,
+  withAlias,
+  type RenderKeys,
+} from "@/lib/render-keys";
 import type { ExpenseCategory, Member } from "@/types/db";
 
 type Props = {
@@ -59,48 +71,187 @@ type DeleteTarget =
   | { kind: "member"; id: string; name: string }
   | { kind: "category"; id: string; name: string };
 
+// Mirrors MEMBER_COLORS / nextMemberColor in src/actions/members.ts so a new member's dot
+// shows its final color immediately instead of flashing a placeholder.
+const MEMBER_COLORS = ["chart-2", "chart-4", "chart-1", "chart-5", "chart-3"];
+
+function nextMemberColor(used: string[]): string {
+  return (
+    MEMBER_COLORS.find((color) => !used.includes(color)) ??
+    MEMBER_COLORS[used.length % MEMBER_COLORS.length]
+  );
+}
+
+// Optimistic local copy of a server list: edits apply instantly and the server copy is
+// only adopted again once every in-flight mutation has settled (then a refresh lands).
+// Create actions don't return the new row, so when the server copy arrives a temp row is
+// matched to its saved twin by name and keeps its render key (no exit + enter flicker).
+function useOptimisticList<T extends { id: string; name: string }>(
+  serverItems: T[],
+) {
+  const [items, setItems] = useState(serverItems);
+  const [renderKeys, setRenderKeys] = useState<RenderKeys>(NO_RENDER_KEYS);
+  const pendingRef = useRef(0);
+  const serverRef = useRef(serverItems);
+  const itemsRef = useRef(serverItems);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    serverRef.current = serverItems;
+    if (pendingRef.current > 0) return;
+    const known = new Set(itemsRef.current.map((item) => item.id));
+    const temps = itemsRef.current.filter((item) => isTempId(item.id));
+    if (temps.length > 0) {
+      setRenderKeys((keys) => {
+        let next = keys;
+        for (const item of serverItems) {
+          if (known.has(item.id)) continue;
+          const index = temps.findIndex((temp) => temp.name === item.name);
+          if (index === -1) continue;
+          next = withAlias(next, item.id, temps[index].id);
+          temps.splice(index, 1);
+        }
+        return next;
+      });
+    }
+    setItems(serverItems);
+  }, [serverItems]);
+
+  return { items, setItems, renderKeys, pendingRef, serverRef };
+}
+
+function isTempId(id: string): boolean {
+  return id.startsWith("optimistic-");
+}
+
+function tempId(): string {
+  return `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function moveId(ids: string[], id: string, direction: -1 | 1): string[] | null {
+  const index = ids.indexOf(id);
+  const next = index + direction;
+  if (index === -1 || next < 0 || next >= ids.length) return null;
+  const reordered = [...ids];
+  [reordered[index], reordered[next]] = [reordered[next], reordered[index]];
+  return reordered;
+}
+
+function reorderById<T extends { id: string }>(items: T[], ids: string[]): T[] {
+  const byId = new Map(items.map((item) => [item.id, item] as const));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((item): item is T => item !== undefined);
+}
+
 export function ExpenseManagementDialog({ members, categories }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const reducedMotion = useReducedMotion();
   const transition: Transition = reducedMotion ? { duration: 0 } : SPRING_SOFT;
 
-  async function runAction(action: () => Promise<ActionResult>) {
-    const result = await action();
+  const memberList = useOptimisticList(members);
+  const categoryList = useOptimisticList(categories);
+  const localMembers = memberList.items;
+  const localCategories = categoryList.items;
+  // Reordering sends every id, so arrows stay disabled until new rows have server ids.
+  const membersSaving = localMembers.some((item) => isTempId(item.id));
+  const categoriesSaving = localCategories.some((item) => isTempId(item.id));
+
+  // Applies a mutation locally right away, then persists it in the background. On
+  // failure the list snaps back to the last server copy.
+  function runOptimistic<T extends { id: string; name: string }>(
+    list: ReturnType<typeof useOptimisticList<T>>,
+    update: (items: T[]) => T[],
+    action: () => Promise<ActionResult>,
+  ) {
+    list.setItems(update);
+    list.pendingRef.current += 1;
+    void action()
+      .then((result) => {
+        if (!result.ok) {
+          toast.error(result.error);
+          list.setItems(list.serverRef.current);
+        }
+      })
+      .catch(() => {
+        toast.error("변경사항을 저장하지 못했습니다.");
+        list.setItems(list.serverRef.current);
+      })
+      .finally(() => {
+        list.pendingRef.current = Math.max(0, list.pendingRef.current - 1);
+        startTransition(() => router.refresh());
+      });
+  }
+
+  async function seedCategories() {
+    const result = await seedDefaultExpenseCategories();
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
-    startTransition(() => {
-      router.refresh();
-    });
+    startTransition(() => router.refresh());
   }
 
-  async function moveItem(
-    ids: string[],
-    id: string,
-    direction: -1 | 1,
-    reorder: (orderedIds: string[]) => Promise<ActionResult>,
-  ) {
-    const index = ids.indexOf(id);
-    const next = index + direction;
-    if (index === -1 || next < 0 || next >= ids.length) return;
-    const reordered = [...ids];
-    [reordered[index], reordered[next]] = [reordered[next], reordered[index]];
-    await runAction(() => reorder(reordered));
+  function addMember(name: string) {
+    const now = new Date().toISOString();
+    runOptimistic(
+      memberList,
+      (items) => [
+        ...items,
+        {
+          id: tempId(),
+          account_id: "",
+          name,
+          color: nextMemberColor(items.map((item) => item.color)),
+          sort_order: items.length,
+          created_at: now,
+        },
+      ],
+      () => createMember(name),
+    );
   }
 
-  async function confirmDelete() {
+  function addCategory(name: string) {
+    const now = new Date().toISOString();
+    runOptimistic(
+      categoryList,
+      (items) => [
+        ...items,
+        {
+          id: tempId(),
+          account_id: "",
+          name,
+          sort_order: items.length,
+          created_at: now,
+        },
+      ],
+      () => createExpenseCategory(name),
+    );
+  }
+
+  function confirmDelete() {
     if (!deleteTarget) return;
     const target = deleteTarget;
     setDeleteTarget(null);
     if (target.kind === "member") {
-      await runAction(() => deleteMember(target.id));
+      runOptimistic(
+        memberList,
+        (items) => items.filter((item) => item.id !== target.id),
+        () => deleteMember(target.id),
+      );
       return;
     }
-    await runAction(() => deleteExpenseCategory(target.id));
+    runOptimistic(
+      categoryList,
+      (items) => items.filter((item) => item.id !== target.id),
+      () => deleteExpenseCategory(target.id),
+    );
   }
 
   return (
@@ -116,7 +267,17 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
             지출 관리
           </Button>
         </DialogTrigger>
-        <DialogContent className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg">
+        <DialogContent
+          className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg"
+          // Edits here apply as they happen; ✓ commits a field still being typed in
+          // (renames save on blur) and closes.
+          onConfirm={() => {
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+            setOpen(false);
+          }}
+        >
           <DialogHeader>
             <DialogTitle>지출 관리</DialogTitle>
             <DialogDescription>
@@ -131,17 +292,16 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
           >
             <ManagementSection
               title="멤버"
-              count={members.length}
-              emptyMessage="아직 멤버가 없습니다. 멤버를 추가하면 사람별로 지출을 나눠 볼 수 있습니다."
+              count={localMembers.length}
+              emptyMessage="멤버가 없습니다"
               addPlaceholder="새 멤버 이름"
-              disabled={pending}
               transition={transition}
-              onAdd={(name) => runAction(() => createMember(name))}
+              onAdd={addMember}
             >
               <AnimatePresence initial={false}>
-                {members.map((member, index) => (
+                {localMembers.map((member, index) => (
                   <ManagementRow
-                    key={member.id}
+                    key={keyOf(memberList.renderKeys, member.id)}
                     name={member.name}
                     leading={
                       <span
@@ -150,21 +310,35 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
                         style={{ backgroundColor: `var(--${member.color})` }}
                       />
                     }
-                    disabled={pending}
-                    canMoveUp={index > 0}
-                    canMoveDown={index < members.length - 1}
+                    disabled={isTempId(member.id)}
+                    canMoveUp={index > 0 && !membersSaving}
+                    canMoveDown={
+                      index < localMembers.length - 1 && !membersSaving
+                    }
                     transition={transition}
                     onRename={(name) =>
-                      runAction(() => renameMember(member.id, name))
-                    }
-                    onMove={(direction) =>
-                      moveItem(
-                        members.map((m) => m.id),
-                        member.id,
-                        direction,
-                        reorderMembers,
+                      runOptimistic(
+                        memberList,
+                        (items) =>
+                          items.map((item) =>
+                            item.id === member.id ? { ...item, name } : item,
+                          ),
+                        () => renameMember(member.id, name),
                       )
                     }
+                    onMove={(direction) => {
+                      const ids = moveId(
+                        localMembers.map((m) => m.id),
+                        member.id,
+                        direction,
+                      );
+                      if (!ids || ids.some(isTempId)) return;
+                      runOptimistic(
+                        memberList,
+                        (items) => reorderById(items, ids),
+                        () => reorderMembers(ids),
+                      );
+                    }}
                     onDelete={() =>
                       setDeleteTarget({
                         kind: "member",
@@ -179,21 +353,17 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
 
             <ManagementSection
               title="카테고리"
-              count={categories.length}
-              emptyMessage="아직 카테고리가 없습니다."
+              count={localCategories.length}
+              emptyMessage="카테고리가 없습니다"
               addPlaceholder="새 카테고리 이름"
-              disabled={pending}
               transition={transition}
-              onAdd={(name) => runAction(() => createExpenseCategory(name))}
+              onAdd={addCategory}
               emptyExtra={
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={pending}
-                  onClick={() =>
-                    runAction(() => seedDefaultExpenseCategories())
-                  }
+                  onClick={() => void seedCategories()}
                 >
                   <Plus className="size-4" />
                   기본 카테고리 채우기
@@ -201,25 +371,39 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
               }
             >
               <AnimatePresence initial={false}>
-                {categories.map((category, index) => (
+                {localCategories.map((category, index) => (
                   <ManagementRow
-                    key={category.id}
+                    key={keyOf(categoryList.renderKeys, category.id)}
                     name={category.name}
-                    disabled={pending}
-                    canMoveUp={index > 0}
-                    canMoveDown={index < categories.length - 1}
+                    disabled={isTempId(category.id)}
+                    canMoveUp={index > 0 && !categoriesSaving}
+                    canMoveDown={
+                      index < localCategories.length - 1 && !categoriesSaving
+                    }
                     transition={transition}
                     onRename={(name) =>
-                      runAction(() => renameExpenseCategory(category.id, name))
-                    }
-                    onMove={(direction) =>
-                      moveItem(
-                        categories.map((c) => c.id),
-                        category.id,
-                        direction,
-                        reorderExpenseCategories,
+                      runOptimistic(
+                        categoryList,
+                        (items) =>
+                          items.map((item) =>
+                            item.id === category.id ? { ...item, name } : item,
+                          ),
+                        () => renameExpenseCategory(category.id, name),
                       )
                     }
+                    onMove={(direction) => {
+                      const ids = moveId(
+                        localCategories.map((c) => c.id),
+                        category.id,
+                        direction,
+                      );
+                      if (!ids || ids.some(isTempId)) return;
+                      runOptimistic(
+                        categoryList,
+                        (items) => reorderById(items, ids),
+                        () => reorderExpenseCategories(ids),
+                      );
+                    }}
                     onDelete={() =>
                       setDeleteTarget({
                         kind: "category",
@@ -260,12 +444,13 @@ export function ExpenseManagementDialog({ members, categories }: Props) {
   );
 }
 
+
 function getDeleteMessage(target: DeleteTarget | null): string {
   if (!target) return "";
   if (target.kind === "member") {
-    return `"${target.name}" 멤버를 삭제합니다. 이 멤버의 지출 기록은 삭제되지 않고 공용으로 이동합니다.`;
+    return `"${target.name}"의 지출은 공용으로 옮겨집니다.`;
   }
-  return `"${target.name}" 카테고리를 삭제합니다. 이 카테고리의 지출 기록은 삭제되지 않고 미분류로 남습니다.`;
+  return `"${target.name}"의 지출은 미분류로 남습니다.`;
 }
 
 function ManagementSection({
@@ -274,7 +459,6 @@ function ManagementSection({
   emptyMessage,
   emptyExtra,
   addPlaceholder,
-  disabled,
   transition,
   onAdd,
   children,
@@ -284,18 +468,17 @@ function ManagementSection({
   emptyMessage: string;
   emptyExtra?: ReactNode;
   addPlaceholder: string;
-  disabled: boolean;
   transition: Transition;
-  onAdd: (name: string) => Promise<void>;
+  onAdd: (name: string) => void;
   children: ReactNode;
 }) {
   const [draft, setDraft] = useState("");
 
-  async function add() {
+  function add() {
     const trimmed = draft.trim();
     if (!trimmed) return;
     setDraft("");
-    await onAdd(trimmed);
+    onAdd(trimmed);
   }
 
   return (
@@ -334,7 +517,7 @@ function ManagementSection({
             }
           }}
           placeholder={addPlaceholder}
-          disabled={disabled}
+          enterKeyHint="done"
           maxLength={40}
           className="h-8 px-3"
         />
@@ -343,7 +526,7 @@ function ManagementSection({
           variant="outline"
           size="sm"
           onClick={add}
-          disabled={disabled || draft.trim().length === 0}
+          disabled={draft.trim().length === 0}
         >
           <Plus className="size-4" />
           추가

@@ -71,6 +71,26 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
+// Stable, distinct identity colors for a set of series (e.g. growth-chart groups), handed
+// out in creation order along the palette (green, blue, amber, purple, rose). Display order
+// never matters, so reordering can't recolor a series, and the first series always gets the
+// brand-adjacent green rather than a hash landing an asset on the "negative"-looking rose.
+export function assignIdentityColors(
+  items: { id: string; created_at: string }[],
+): Map<string, string> {
+  const ordered = [...items].sort((a, b) =>
+    a.created_at === b.created_at
+      ? a.id.localeCompare(b.id)
+      : a.created_at.localeCompare(b.created_at),
+  );
+  return new Map(
+    ordered.map((item, index) => [
+      item.id,
+      IDENTITY_COLORS[index % IDENTITY_COLORS.length],
+    ]),
+  );
+}
+
 export function getCategoryVisual(
   id: string | null,
   name: string | null,

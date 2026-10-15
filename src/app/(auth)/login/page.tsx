@@ -48,7 +48,7 @@ export default function LoginPage() {
           <Wallet className="size-5.5" strokeWidth={2.2} aria-hidden />
         </span>
         <CardTitle className="text-xl tracking-tight">ShowMyMoney</CardTitle>
-        <CardDescription>PIN을 입력해 계정에 접속하세요.</CardDescription>
+        <CardDescription>PIN을 입력하세요.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">

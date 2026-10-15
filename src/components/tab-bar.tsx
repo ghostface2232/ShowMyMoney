@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ReceiptText, Wallet, type LucideIcon } from "lucide-react";
 
-import { saveScrollPosition } from "@/lib/scroll-memory";
+import { getScrollContainer, saveScrollPosition } from "@/lib/scroll-memory";
 import { cn } from "@/lib/utils";
 
 type Tab = {
@@ -22,7 +22,8 @@ const TABS: Tab[] = [
   { href: "/expenses", label: "지출", icon: ReceiptText },
 ];
 
-const AUTH_ROUTES = ["/login", "/signup"];
+// Routes without the tab bar: auth screens and the offline fallback (tabs can't load offline).
+const HIDDEN_ROUTES = ["/login", "/signup", "/~offline"];
 
 function tabHrefOf(pathname: string): string {
   return pathname.startsWith("/expenses") ? "/expenses" : "/";
@@ -37,7 +38,7 @@ export function TabBar() {
   );
   if (pending && pending.from !== pathname) setPending(null);
 
-  if (AUTH_ROUTES.some((route) => pathname.startsWith(route))) return null;
+  if (HIDDEN_ROUTES.some((route) => pathname.startsWith(route))) return null;
 
   const activeHref = pending?.href ?? tabHrefOf(pathname);
   const activeIndex = Math.max(
@@ -78,6 +79,13 @@ export function TabBar() {
               // instead of jumping to the top on every switch.
               scroll={false}
               onClick={(event) => {
+                // iOS convention: tapping the selected tab scrolls its content to the top.
+                // (The status-bar tap can't reach the app-shell scroll container.)
+                if (active) {
+                  event.preventDefault();
+                  getScrollContainer()?.scrollTo({ top: 0, behavior: "smooth" });
+                  return;
+                }
                 saveScrollPosition(pathname);
                 const plainClick =
                   event.button === 0 &&
@@ -85,7 +93,7 @@ export function TabBar() {
                   !event.ctrlKey &&
                   !event.shiftKey &&
                   !event.altKey;
-                if (plainClick && !active) {
+                if (plainClick) {
                   setPending({ href: tab.href, from: pathname });
                 }
               }}

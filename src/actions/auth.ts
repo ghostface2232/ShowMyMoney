@@ -48,6 +48,9 @@ export async function signUp(displayName: string, pin: string): Promise<Result> 
   if (trimmed.length === 0) {
     return { ok: false, error: "표시 이름을 입력하세요." };
   }
+  if (trimmed.length > 40) {
+    return { ok: false, error: "표시 이름은 40자 이하로 입력하세요." };
+  }
   if (!isValidPin(pin)) {
     return { ok: false, error: "PIN은 숫자 6~12자리여야 합니다." };
   }

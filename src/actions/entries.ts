@@ -44,7 +44,7 @@ export async function upsertEntry(
 ): Promise<Result<{ entry: Entry }>> {
   const accountId = await requireAccount();
 
-  if (!Number.isFinite(amount) || amount < 0) {
+  if (!Number.isSafeInteger(amount) || amount < 0) {
     return { ok: false, error: "금액은 0 이상이어야 합니다." };
   }
 

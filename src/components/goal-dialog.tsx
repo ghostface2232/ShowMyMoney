@@ -1,7 +1,7 @@
 // Goal analysis Dialog. Shows the current total assets prominently at the top, and per-goal progress, required monthly savings, and status. Creates/edits via an inline form and confirms deletion with an AlertDialog.
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AnimatePresence,
@@ -34,7 +34,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { formatKRW } from "@/lib/format";
+import { amountDigits, formatAmountInput, formatKRW } from "@/lib/format";
 import {
   monthsUntil,
   progressPct,
@@ -72,7 +72,9 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
   // Guard to prevent overflow-y-auto from briefly showing a scrollbar during the layout animation.
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const today = useMemo(() => new Date(), []);
+  // Re-read on every open: the header stays mounted for the app's lifetime, so a date
+  // captured once would go stale across midnight or a month boundary.
+  const [today, setToday] = useState(() => new Date());
 
   function resetForm() {
     setCreating(false);
@@ -96,16 +98,27 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
     setEditingId(goal.id);
   }
 
-  async function submit(mode: "create" | "update", goalId?: string) {
+  // Returns whether the goal was saved, so the sheet's ✓ knows it may close.
+  async function submit(
+    mode: "create" | "update",
+    goalId?: string,
+  ): Promise<boolean> {
     const label = draft.label.trim();
     const amount = Number(draft.amount.replace(/\D/g, ""));
     const date = draft.date;
 
-    if (!label) return toast.error("라벨을 입력하세요.");
-    if (!Number.isFinite(amount) || amount <= 0)
-      return toast.error("목표 금액은 0보다 커야 합니다.");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
-      return toast.error("목표일을 입력하세요.");
+    if (!label) {
+      toast.error("라벨을 입력하세요.");
+      return false;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("목표 금액은 0보다 커야 합니다.");
+      return false;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      toast.error("목표일을 입력하세요.");
+      return false;
+    }
 
     const result =
       mode === "create"
@@ -114,10 +127,19 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
 
     if (!result.ok) {
       toast.error(result.error);
-      return;
+      return false;
     }
     resetForm();
     startTransition(() => router.refresh());
+    return true;
+  }
+
+  // Sheet bar ✓: commits an open goal form (staying open if it's invalid), then closes.
+  async function confirm() {
+    if (creating && !(await submit("create"))) return;
+    if (editingId && !(await submit("update", editingId))) return;
+    setOpen(false);
+    resetForm();
   }
 
   async function confirmDelete() {
@@ -138,6 +160,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
+          if (next) setToday(new Date());
           if (!next) resetForm();
         }}
       >
@@ -151,7 +174,11 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
             목표 분석
           </Button>
         </DialogTrigger>
-        <DialogContent className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg">
+        <DialogContent
+          className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg"
+          onConfirm={() => void confirm()}
+          confirmDisabled={pending}
+        >
           <DialogHeader>
             <DialogTitle>목표 분석</DialogTitle>
             <DialogDescription>
@@ -282,7 +309,7 @@ export function GoalDialog({ goals, currentTotalAssets, hasSnapshot }: Props) {
             <AlertDialogTitle>목표 삭제</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? `"${deleteTarget.label}" 목표가 삭제됩니다. 되돌릴 수 없습니다.`
+                ? `"${deleteTarget.label}" 목표가 삭제됩니다.`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -306,7 +333,7 @@ function CurrentAssetsHeader({
   if (!hasSnapshot) {
     return (
       <div className="rounded-2xl border border-dashed bg-muted/40 px-4 py-5 text-center text-sm text-muted-foreground">
-        기록이 먼저 필요합니다. 첫 달을 추가하면 목표 달성률을 계산할 수 있습니다.
+        월별 기록을 추가하면 달성률을 계산합니다
       </div>
     );
   }
@@ -325,7 +352,7 @@ function CurrentAssetsHeader({
 function EmptyGoals() {
   return (
     <div className="rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground">
-      아직 목표가 없습니다. 첫 목표를 추가해 보세요.
+      목표가 없습니다
     </div>
   );
 }
@@ -362,7 +389,9 @@ function GoalItem({
     hasSnapshot ? currentTotal : 0,
     months,
   );
-  const showRequired = hasSnapshot && status !== "reached";
+  const overdue = status === "overdue";
+  // Past the deadline there are no months left to spread the gap over.
+  const showRequired = hasSnapshot && status === "on-track";
 
   return (
     <div
@@ -416,9 +445,13 @@ function GoalItem({
           달성
         </span>
         <span aria-hidden>·</span>
-        <span>
-          <span className="font-medium text-foreground">{months}</span>개월 남음
-        </span>
+        {overdue ? (
+          <span className="font-medium text-negative">기한 지남</span>
+        ) : (
+          <span>
+            <span className="font-medium text-foreground">{months}</span>개월 남음
+          </span>
+        )}
         {showRequired ? (
           <>
             <span aria-hidden>·</span>
@@ -508,20 +541,20 @@ function GoalForm({
         onChange={(event) =>
           setDraft({ ...draft, label: event.target.value })
         }
-        placeholder="목표 이름 (예: 올해 목표)"
+        placeholder="목표 이름"
         maxLength={40}
         disabled={pending}
       />
       <Input
         inputMode="numeric"
-        value={draft.amount}
+        value={formatAmountInput(draft.amount)}
         onChange={(event) =>
           setDraft({
             ...draft,
-            amount: event.target.value.replace(/\D/g, ""),
+            amount: amountDigits(event.target.value),
           })
         }
-        placeholder="목표 금액 (원)"
+        placeholder="목표 금액"
         disabled={pending}
       />
       <Input
@@ -532,7 +565,7 @@ function GoalForm({
       />
       {datePast ? (
         <span className="text-[11px] text-destructive">
-          지난 날짜입니다. 그대로 저장할 수 있지만 기한 경과로 표시됩니다.
+          지난 날짜입니다
         </span>
       ) : null}
       <div className="flex justify-end gap-2 pt-1">

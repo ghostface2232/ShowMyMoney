@@ -1,5 +1,6 @@
-// Animates route content on pathname changes. Tab routes slide horizontally in the
-// direction of travel (swipe feel); other transitions fall back to fade + slight y offset.
+// Animates route content on pathname changes. Tab routes shift slightly in the direction
+// of travel with a crossfade; other transitions fade with a slight y offset; Reduce Motion
+// gets a plain crossfade.
 // Outgoing and incoming pages share one grid cell; the outgoing page keeps rendering its own
 // frozen route tree (instead of a second copy of the new page) and stays visually pinned
 // while the scroll container jumps to the incoming tab's remembered offset. The slide is a
@@ -27,7 +28,7 @@ import {
 } from "motion/react";
 
 import { markClientNavigation } from "@/lib/app-navigation";
-import { DURATION_BASE, EASE_OUT } from "@/lib/motion";
+import { DURATION_BASE, DURATION_FAST, EASE_OUT } from "@/lib/motion";
 import {
   getScrollContainer,
   getScrollPosition,
@@ -55,18 +56,29 @@ function tabIndex(pathname: string): number {
   return -1;
 }
 
+// Tab switches are frequent, so the slide stays short (HIG: keep motion for frequent
+// interactions minimal): a small shift in the direction of travel plus a crossfade.
+const TAB_SHIFT = 20;
+
 const variants = {
   enter: ({ direction }: Transit) =>
     direction === 0
       ? { opacity: 0, transform: "translateY(6px)" }
-      : { opacity: 0, transform: `translateX(${48 * direction}px)` },
+      : { opacity: 0, transform: `translateX(${TAB_SHIFT * direction}px)` },
   // Settle on a real `none`: a lingering identity transform would keep the whole page a
   // stacking context / containing block between transitions.
   center: { opacity: 1, transform: "none", transitionEnd: { transform: "none" } },
   exit: ({ direction }: Transit) =>
     direction === 0
       ? { opacity: 0, transform: "translateY(-4px)" }
-      : { opacity: 0, transform: `translateX(${-48 * direction}px)` },
+      : { opacity: 0, transform: `translateX(${-TAB_SHIFT * direction}px)` },
+};
+
+// Reduce Motion: HIG asks to replace x/y movement with fades rather than drop feedback.
+const reducedVariants = {
+  enter: { opacity: 0 },
+  center: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 export function MotionShell({ children }: Props) {
@@ -122,15 +134,14 @@ export function MotionShell({ children }: Props) {
         <motion.div
           key={pathname}
           custom={transit}
-          variants={variants}
+          variants={reducedMotion ? reducedVariants : variants}
           initial="enter"
           animate="center"
           exit="exit"
-          transition={
-            reducedMotion
-              ? { duration: 0 }
-              : { duration: DURATION_BASE, ease: EASE_OUT }
-          }
+          transition={{
+            duration: reducedMotion ? DURATION_FAST : DURATION_BASE,
+            ease: EASE_OUT,
+          }}
           className="col-start-1 row-start-1 flex min-w-0 flex-col"
         >
           <RoutePage>{children}</RoutePage>
@@ -164,7 +175,11 @@ function RoutePage({ children }: { children: ReactNode }) {
       <div
         inert={!isPresent}
         className="relative flex flex-1 flex-col"
-        style={exitShift ? { top: exitShift } : undefined}
+        // Safari 27 enables scroll anchoring; a leaving page must never be picked as the
+        // anchor, or removing it would nudge the incoming tab's restored offset.
+        style={
+          isPresent ? undefined : { top: exitShift ?? 0, overflowAnchor: "none" }
+        }
       >
         {children}
       </div>

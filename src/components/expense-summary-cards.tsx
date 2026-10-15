@@ -144,11 +144,6 @@ export function ExpenseSummaryCards({ members, totals, prevTotals }: Props) {
           );
         })}
       </Card>
-      {members.length === 0 ? (
-        <p className="px-1 text-xs text-muted-foreground">
-          헤더의 관리에서 멤버를 추가하면 사람별 지출을 나눠 볼 수 있습니다.
-        </p>
-      ) : null}
     </div>
   );
 }

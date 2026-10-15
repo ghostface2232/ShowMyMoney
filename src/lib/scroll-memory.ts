@@ -3,6 +3,8 @@
 // never scrolls (see the root layout); all scrolling happens in this container.
 
 export const SCROLL_CONTAINER_ID = "app-scroll";
+// The (app) layout's large-title header; ScrollEdgeChrome collapses the title once it's gone.
+export const APP_HEADER_ID = "app-header";
 
 const positions = new Map<string, number>();
 

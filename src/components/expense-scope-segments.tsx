@@ -42,7 +42,7 @@ export function ExpenseScopeSegments({ members, scope, onScopeChange }: Props) {
   return (
     <div
       aria-label="지출 범위 선택"
-      className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain px-0.5 py-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="-my-1 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain px-0.5 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {chips.map((chip) => {
         const active = scope === chip.key;
@@ -53,7 +53,8 @@ export function ExpenseScopeSegments({ members, scope, onScopeChange }: Props) {
             aria-pressed={active}
             onClick={() => onScopeChange(chip.key)}
             className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px]",
+              // The ::after pads the single-row chips to a 44pt touch target vertically.
+              "relative inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-1 pointer-coarse:after:content-['']",
               "transition-[background-color,color,box-shadow,scale] duration-200 ease-out active:scale-[0.96]",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               active

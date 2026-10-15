@@ -35,12 +35,28 @@ export function formatDayLabel(spentOn: string): string {
 }
 
 // Compact currency notation for tight spaces like chart axes. Compresses into man/eok (10K/100M) units and omits the won unit.
+// Rounds the magnitude first (so ±values are symmetric) and re-buckets after rounding
+// (99,995,000 → "1억", not "10000만").
 export function formatKRWCompact(amount: number): string {
-  const abs = Math.abs(amount);
-  if (abs < 10_000) return String(Math.round(amount));
-  if (abs < 100_000_000) return `${Math.round(amount / 10_000)}만`;
-  const eok = amount / 100_000_000;
-  if (Math.abs(eok) >= 10) return `${Math.round(eok)}억`;
+  const sign = amount < 0 ? "-" : "";
+  const abs = Math.round(Math.abs(amount));
+  if (abs < 10_000) return `${sign}${abs}`;
+  const man = Math.round(abs / 10_000);
+  if (man < 10_000) return `${sign}${man}만`;
+  const eok = abs / 100_000_000;
+  if (eok >= 10) return `${sign}${Math.round(eok)}억`;
   const rounded = Math.round(eok * 10) / 10;
-  return `${rounded.toFixed(1).replace(/\.0$/, "")}억`;
+  return `${sign}${rounded.toFixed(1).replace(/\.0$/, "")}억`;
+}
+
+// Amount text fields keep raw digits in state and display them grouped ("1,250,000") as
+// the user types, the way banking apps do. 13 digits stays well inside safe integers.
+const AMOUNT_MAX_DIGITS = 13;
+
+export function amountDigits(text: string): string {
+  return text.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, AMOUNT_MAX_DIGITS);
+}
+
+export function formatAmountInput(digits: string): string {
+  return digits === "" ? "" : numberFormatter.format(Number(digits));
 }

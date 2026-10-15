@@ -3,7 +3,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Trash2 } from "lucide-react";
+import { Loader2, LogOut, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { signOut } from "@/actions/auth";
@@ -104,13 +104,15 @@ function ProfileDialog({
     onOpenChange(next);
   }
 
-  async function saveDisplayName() {
+  // Each returns whether it succeeded, so the sheet's ✓ only closes once all pending
+  // changes are saved.
+  async function saveDisplayName(): Promise<boolean> {
     const trimmed = name.trim();
     if (trimmed.length === 0) {
       toast.error("표시 이름을 입력하세요.");
-      return;
+      return false;
     }
-    if (trimmed === displayName) return;
+    if (trimmed === displayName) return true;
 
     setNameSaving(true);
     const result = await updateDisplayName(trimmed);
@@ -118,16 +120,17 @@ function ProfileDialog({
 
     if (!result.ok) {
       toast.error(result.error);
-      return;
+      return false;
     }
     toast.success("표시 이름을 변경했습니다.");
     startTransition(() => router.refresh());
+    return true;
   }
 
-  async function savePin() {
+  async function savePin(): Promise<boolean> {
     if (newPin !== confirmPin) {
       toast.error("새 PIN이 서로 일치하지 않습니다.");
-      return;
+      return false;
     }
     setPinSaving(true);
     const result = await changePin(oldPin, newPin);
@@ -135,12 +138,27 @@ function ProfileDialog({
 
     if (!result.ok) {
       toast.error(result.error);
-      return;
+      return false;
     }
     toast.success("PIN을 변경했습니다.");
     setOldPin("");
     setNewPin("");
     setConfirmPin("");
+    return true;
+  }
+
+  // Sheet bar ✓: saves whatever was changed (name, and the PIN once all three fields are
+  // filled), then closes. A partly filled PIN form is reported instead of ignored.
+  async function confirm() {
+    const pinTouched =
+      oldPin.length > 0 || newPin.length > 0 || confirmPin.length > 0;
+    if (pinTouched && !pinReady) {
+      toast.error("PIN을 바꾸려면 세 칸을 모두 입력하세요.");
+      return;
+    }
+    if (nameDirty && !(await saveDisplayName())) return;
+    if (pinReady && !(await savePin())) return;
+    onOpenChange(false);
   }
 
   const nameDirty = name.trim().length > 0 && name.trim() !== displayName;
@@ -150,7 +168,11 @@ function ProfileDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-md">
+        <DialogContent
+          className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-md"
+          onConfirm={() => void confirm()}
+          confirmDisabled={nameSaving || pinSaving}
+        >
           <DialogHeader>
             <DialogTitle>프로필 설정</DialogTitle>
             <DialogDescription>{formatFirstUsed(firstUsedAt)}</DialogDescription>
@@ -159,24 +181,15 @@ function ProfileDialog({
           <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pr-1">
             <section className="flex flex-col gap-2">
               <Label htmlFor="profile-display-name">표시 이름</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="profile-display-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  maxLength={40}
-                  disabled={nameSaving}
-                  className={INPUT_NO_FOCUS_RING}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={saveDisplayName}
-                  disabled={nameSaving || !nameDirty}
-                >
-                  저장
-                </Button>
-              </div>
+              <Input
+                id="profile-display-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={40}
+                disabled={nameSaving}
+                enterKeyHint="done"
+                className={INPUT_NO_FOCUS_RING}
+              />
             </section>
 
             <section className="flex flex-col gap-2">
@@ -221,53 +234,29 @@ function ProfileDialog({
                   autoComplete="new-password"
                   className={INPUT_NO_FOCUS_RING}
                 />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={savePin}
-                  disabled={pinSaving || !pinReady}
-                  className="self-end"
-                >
-                  PIN 변경
-                </Button>
               </div>
             </section>
 
-            <section className="flex items-center justify-between gap-2">
-              <div className="flex flex-col gap-0.5">
-                <Label>로그아웃</Label>
-                <p className="text-xs text-muted-foreground">
-                  현재 기기에서 세션을 종료합니다.
-                </p>
-              </div>
+            {/* The buttons say what they do; the confirmation alert explains the rest. */}
+            <section className="flex flex-col gap-2">
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 onClick={() => {
                   void signOut();
                 }}
+                className="w-full"
               >
-                <LogOut className="size-3.5" />
+                <LogOut className="size-4" />
                 로그아웃
               </Button>
-            </section>
-
-            <section className="flex items-center justify-between gap-2">
-              <div className="flex flex-col gap-0.5">
-                <Label className="text-destructive">위험 영역</Label>
-                <p className="text-xs text-muted-foreground">
-                  계정을 삭제하면 모든 기록이 함께 삭제됩니다.
-                </p>
-              </div>
               <Button
                 type="button"
-                variant="destructive"
-                size="sm"
+                variant="ghost"
                 onClick={() => setDeleteConfirmOpen(true)}
+                className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
-                <Trash2 className="size-3.5" />
+                <Trash2 className="size-4" />
                 계정 삭제
               </Button>
             </section>
@@ -329,7 +318,7 @@ function DeleteAccountAlert({
         <AlertDialogHeader>
           <AlertDialogTitle>계정을 삭제할까요?</AlertDialogTitle>
           <AlertDialogDescription>
-            확인을 위해 현재 PIN을 다시 입력하세요. 삭제된 계정은 복구할 수 없습니다.
+            모든 기록이 함께 삭제되며 되돌릴 수 없습니다. 현재 PIN을 입력하세요.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="flex flex-col gap-2">
@@ -353,8 +342,10 @@ function DeleteAccountAlert({
               performDelete();
             }}
             disabled={deleting || pin.length === 0}
+            aria-busy={deleting || undefined}
             className="bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/40"
           >
+            {deleting ? <Loader2 className="animate-spin" /> : null}
             삭제
           </AlertDialogAction>
         </AlertDialogFooter>

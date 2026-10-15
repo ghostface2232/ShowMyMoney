@@ -59,7 +59,9 @@
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 0.52 keeps secondary text at >= 4.5:1 (WCAG AA, as HIG requires for text <= 17pt)
+     on both the page background and cards; 0.556 measured 4.4:1 on the background. */
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -74,9 +76,10 @@
   --chart-3: oklch(0.72 0.13 75);
   --chart-4: oklch(0.62 0.14 300);
   --chart-5: oklch(0.65 0.13 20);
-  /* Semantic delta colors: asset gain / spending decrease read as positive. */
-  --positive: oklch(0.6 0.15 156);
-  --negative: oklch(0.577 0.196 25.5);
+  /* Semantic delta colors: asset gain / spending decrease read as positive. Tuned so the
+     11px delta badges keep >= 4.5:1 over their own 10% tint. */
+  --positive: oklch(0.52 0.14 156);
+  --negative: oklch(0.55 0.19 25.5);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -135,6 +138,9 @@
     translate: 0 1.5rem;
     pointer-events: none;
   }
+  html[data-keyboard-open] [data-slot="scroll-edge-bottom"] {
+    opacity: 0;
+  }
   html[data-keyboard-open] [data-slot="tab-bar"] * {
     pointer-events: none;
   }
@@ -142,5 +148,25 @@
   h2,
   h3 {
     text-wrap: balance;
+  }
+}
+
+/* Increase Contrast (prefers-contrast: more): darker secondary text and visible hairlines,
+   as HIG asks for an increased-contrast variant of the palette. */
+@media (prefers-contrast: more) {
+  :root {
+    --muted-foreground: oklch(0.4 0 0);
+    --border: oklch(0.8 0 0);
+    --input: oklch(0.8 0 0);
+  }
+}
+
+/* Reduce Transparency: glass and blurred chrome become solid surfaces. */
+@media (prefers-reduced-transparency: reduce) {
+  [data-slot="tab-bar"] > div,
+  [data-slot="scroll-edge-top"] > div {
+    background-color: var(--background);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }

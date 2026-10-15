@@ -151,8 +151,8 @@ export function SummaryCards({ dashboard }: Props) {
       <GrowthDialog
         open={open}
         onOpenChange={setOpen}
-        title="그룹별 월별 증가량"
-        subtitle="그룹별 최근 순변화량 추이"
+        title="월별 증감"
+        subtitle="그룹별 최근 월별 순변화량"
         data={growthData}
         series={growthSeries}
       />

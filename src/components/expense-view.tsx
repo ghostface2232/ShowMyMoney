@@ -26,6 +26,12 @@ import { Button } from "@/components/ui/button";
 import { YearMonthPicker } from "@/components/year-month-picker";
 import { SCOPE_ALL, SCOPE_SHARED } from "@/lib/expense-scope";
 import { formatYearMonthLong } from "@/lib/format";
+import { UNDO_TOAST_MS } from "@/lib/motion";
+import {
+  NO_RENDER_KEYS,
+  withAlias,
+  type RenderKeys,
+} from "@/lib/render-keys";
 import { replaceEqualDeep } from "@/lib/structural-sharing";
 import {
   currentYearMonth,
@@ -60,6 +66,7 @@ export function ExpenseView({ dashboard }: Props) {
   const [scope, setScope] = useState<string>(SCOPE_ALL);
 
   const [localExpenses, setLocalExpensesState] = useState(dashboard.expenses);
+  const [renderKeys, setRenderKeys] = useState<RenderKeys>(NO_RENDER_KEYS);
   const localExpensesRef = useRef(dashboard.expenses);
   const serverExpensesRef = useRef(dashboard.expenses);
   const pendingBackgroundCountRef = useRef(0);
@@ -162,6 +169,7 @@ export function ExpenseView({ dashboard }: Props) {
     };
     applyLocal((rows) => sortExpenses([temp, ...rows]));
     runInBackground(createExpense(input), (result) => {
+      setRenderKeys((keys) => withAlias(keys, result.expense.id, tempId));
       applyLocal((rows) =>
         rows.map((row) => (row.id === tempId ? result.expense : row)),
       );
@@ -197,8 +205,27 @@ export function ExpenseView({ dashboard }: Props) {
   }
 
   function removeExpense(expenseId: string) {
+    const removed = localExpensesRef.current.find((row) => row.id === expenseId);
     applyLocal((rows) => rows.filter((row) => row.id !== expenseId));
-    runInBackground(deleteExpense(expenseId));
+    // Undo instead of a confirmation step (HIG: no alerts for common, undoable actions).
+    // Offered only after the delete succeeds, so undo can't duplicate a restored row.
+    runInBackground(deleteExpense(expenseId), () => {
+      if (!removed) return;
+      toast("지출을 삭제했습니다.", {
+        duration: UNDO_TOAST_MS,
+        action: {
+          label: "되돌리기",
+          onClick: () =>
+            addExpense({
+              amount: Number(removed.amount),
+              categoryId: removed.category_id,
+              memberId: removed.member_id,
+              spentOn: removed.spent_on,
+              memo: removed.memo ?? undefined,
+            }),
+        },
+      });
+    });
   }
 
   function goToMonth(yearMonth: number) {
@@ -260,8 +287,8 @@ export function ExpenseView({ dashboard }: Props) {
 
   const emptyMessage =
     localExpenses.length === 0
-      ? `아직 ${formatYearMonthLong(dashboard.yearMonth)} 지출이 없습니다. 아래에서 첫 지출을 추가해 보세요.`
-      : `${scopeLabel} 범위의 지출이 없습니다.`;
+      ? `${formatYearMonthLong(dashboard.yearMonth)} 지출이 없습니다`
+      : `${scopeLabel} 지출이 없습니다`;
 
   return (
     <div className="flex flex-col gap-6">
@@ -282,6 +309,7 @@ export function ExpenseView({ dashboard }: Props) {
             existing={monthsWithData}
             existingMode="selectable"
             onSelect={goToMonth}
+            title="월 이동"
             disabled={navPending}
             trigger={
               <Button
@@ -349,6 +377,7 @@ export function ExpenseView({ dashboard }: Props) {
           // running dozens of row exit/enter + FLIP animations at once.
           key={effectiveScope}
           expenses={scopedExpenses}
+          renderKeys={renderKeys}
           categories={dashboard.categories}
           members={dashboard.members}
           runAction={runAction}

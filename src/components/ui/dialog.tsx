@@ -6,7 +6,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Cancel01Icon } from "@hugeicons/core-free-icons"
+import { Cancel01Icon, Tick02Icon } from "@hugeicons/core-free-icons"
 
 function Dialog({
   ...props
@@ -31,6 +31,16 @@ function DialogClose({
 }: React.ComponentProps<typeof DialogPrimitive.Close>) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
 }
+
+// Bar buttons are rendered by DialogHeader (every dialog has one) so they share a row with
+// the title block and stay vertically centered on it, however tall the subtitle gets.
+type DialogBar = {
+  showCloseButton: boolean
+  onConfirm?: () => void
+  confirmDisabled: boolean
+  confirmLabel: string
+}
+const DialogBarContext = React.createContext<DialogBar | null>(null)
 
 // Matches the `sm` breakpoint below which DialogContent presents as a bottom sheet.
 const SHEET_MEDIA_QUERY = "(max-width: 639px)"
@@ -60,10 +70,18 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onConfirm,
+  confirmDisabled = false,
+  confirmLabel = "완료",
   onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  // Sheets with input get the iOS bar pair: Cancel (X) on the leading edge and a tinted
+  // confirm (✓) on the trailing edge. Without it, the sheet only shows a trailing X.
+  onConfirm?: () => void
+  confirmDisabled?: boolean
+  confirmLabel?: string
 }) {
   const [sheet, setSheet] = React.useState<HTMLDivElement | null>(null)
   const overlayRef = React.useRef<HTMLDivElement>(null)
@@ -92,10 +110,12 @@ function DialogContent({
           // Mobile-first: an iOS-style bottom sheet. Slides in fully with the drawer curve,
           // rides on top of the on-screen keyboard (--keyboard-inset from ViewportSync) and
           // caps its height to the visible viewport so nothing hides behind the keyboard.
-          "fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] z-50 grid max-h-[calc(var(--visual-viewport-height,100dvh)-3rem)] w-full gap-6 overflow-y-auto overscroll-contain rounded-t-4xl bg-popover p-6 pb-[max(calc(env(safe-area-inset-bottom)-var(--keyboard-inset,0px)),1.5rem)] text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 outline-none",
+          "fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] z-50 grid max-h-[calc(var(--visual-viewport-height,100dvh)-3rem)] w-full gap-6 overflow-y-auto overscroll-contain rounded-t-[var(--sheet-radius)] [--sheet-radius:2.375rem] bg-popover p-6 pb-[max(calc(env(safe-area-inset-bottom)-var(--keyboard-inset,0px)),1.5rem)] text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 outline-none",
           "transition-[bottom,max-height] duration-250 ease-[cubic-bezier(0.32,0.72,0,1)] animation-duration-[420ms] data-open:animate-in data-open:slide-in-from-bottom-full data-closed:animate-out data-closed:slide-out-to-bottom-full data-closed:animation-duration-[280ms]",
+          // Reduce Motion: fade the sheet in place instead of sliding it (HIG).
+          "motion-reduce:data-open:slide-in-from-bottom-0 motion-reduce:data-open:fade-in-0 motion-reduce:data-closed:slide-out-to-bottom-0 motion-reduce:data-closed:fade-out-0",
           // Desktop (sm+): centered modal with the original zoom presentation.
-          "sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[calc(100dvh-3rem)] sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-4xl sm:pb-6 sm:transition-none sm:animation-duration-100 sm:ease-out sm:data-open:fade-in-0 sm:data-open:zoom-in-95 sm:data-open:slide-in-from-bottom-0 sm:data-closed:fade-out-0 sm:data-closed:zoom-out-95 sm:data-closed:slide-out-to-bottom-0 sm:data-closed:animation-duration-100",
+          "sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[calc(100dvh-3rem)] sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[var(--sheet-radius)] sm:pb-6 sm:transition-none sm:animation-duration-100 sm:ease-out sm:data-open:fade-in-0 sm:data-open:zoom-in-95 sm:data-open:slide-in-from-bottom-0 sm:data-closed:fade-out-0 sm:data-closed:zoom-out-95 sm:data-closed:slide-out-to-bottom-0 sm:data-closed:animation-duration-100",
           className
         )}
         {...props}
@@ -104,19 +124,11 @@ function DialogContent({
           aria-hidden
           className="pointer-events-none absolute top-2.5 left-1/2 h-1 w-9 -translate-x-1/2 rounded-full bg-muted-foreground/25 sm:hidden"
         />
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute top-4 right-4 bg-secondary"
-              size="icon-sm"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
-              <span className="sr-only">Close</span>
-            </Button>
-          </DialogPrimitive.Close>
-        )}
+        <DialogBarContext.Provider
+          value={{ showCloseButton, onConfirm, confirmDisabled, confirmLabel }}
+        >
+          {children}
+        </DialogBarContext.Provider>
         {/* Programmatic close target for the drag-to-dismiss gesture. */}
         <DialogPrimitive.Close
           ref={closeRef}
@@ -221,17 +233,26 @@ function useSheetDragToDismiss(
         // from the inline transform/opacity left here — no jump back to the top.
         sheet!.style.transition = ""
         closeRef.current?.click()
+        // The owner may refuse to close (e.g. to confirm discarding unsaved edits);
+        // then the sheet springs back instead of staying where the finger left it.
+        requestAnimationFrame(() => {
+          if (sheet!.dataset.state === "open") snapBack()
+        })
         return
       }
 
-      const snapBack = `transform 0.4s ${SHEET_EASE}`
-      sheet!.style.transition = snapBack
+      snapBack()
+    }
+
+    function snapBack() {
+      const transition = `transform 0.4s ${SHEET_EASE}`
+      sheet!.style.transition = transition
       sheet!.style.transform = ""
       setOverlayStyle("", `opacity 0.4s ${SHEET_EASE}`)
       sheet!.addEventListener(
         "transitionend",
         () => {
-          if (sheet!.style.transition === snapBack) sheet!.style.transition = ""
+          if (sheet!.style.transition === transition) sheet!.style.transition = ""
           setOverlayStyle("", "")
         },
         { once: true }
@@ -266,13 +287,64 @@ function startsAtScrollTop(target: EventTarget | null, sheet: HTMLElement) {
   return false
 }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+// iOS sheet bar: [X] [title, centered] [✓]. Buttons are 44pt circles on one centered row.
+// A DialogDescription inside the header is kept for screen readers only — the bar carries
+// just the title, as on iOS; put guidance users must see in the sheet body instead. With
+// only a close button, a matching spacer on the leading side keeps the title centered.
+function DialogHeader({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"div">) {
+  const bar = React.useContext(DialogBarContext)
+  const closeButton = bar?.showCloseButton ? (
+    <DialogPrimitive.Close data-slot="dialog-close" asChild>
+      <Button
+        variant="ghost"
+        size="icon-lg"
+        className="size-11 bg-secondary hover:bg-secondary/80"
+      >
+        <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-[18px]" />
+        <span className="sr-only">{bar.onConfirm ? "취소" : "닫기"}</span>
+      </Button>
+    </DialogPrimitive.Close>
+  ) : null
+  const confirmButton = bar?.onConfirm ? (
+    <Button
+      type="button"
+      data-slot="dialog-confirm"
+      size="icon-lg"
+      className="size-11"
+      disabled={bar.confirmDisabled}
+      onClick={bar.onConfirm}
+      aria-label={bar.confirmLabel}
+    >
+      <HugeiconsIcon icon={Tick02Icon} strokeWidth={2.4} className="size-5" />
+    </Button>
+  ) : null
+  const spacer = <span aria-hidden className="size-11 shrink-0" />
+
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-1.5", className)}
-      {...props}
-    />
+      // Concentric corners: the 44pt bar buttons (radius 22) sit 16px in from the top and
+      // side edges, and the sheet's --sheet-radius is 22 + 16 = 38px, so each button's arc
+      // shares its center with the sheet corner. -m pulls the bar from the 24px content
+      // padding out to that 16px inset.
+      className="-mx-2 -mt-2 flex min-h-11 items-center gap-3"
+    >
+      {confirmButton ? closeButton : spacer}
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col items-center text-center [&_[data-slot=dialog-description]]:sr-only",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+      {confirmButton ?? closeButton ?? spacer}
+    </div>
   )
 }
 
@@ -311,7 +383,7 @@ function DialogTitle({
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        "font-heading text-base leading-none font-medium",
+        "font-heading text-[17px] leading-snug font-semibold tracking-tight",
         className
       )}
       {...props}
@@ -327,7 +399,7 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        "text-[13px] leading-snug text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
         className
       )}
       {...props}

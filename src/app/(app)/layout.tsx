@@ -3,16 +3,18 @@
 // only the content below it slides via MotionShell.
 import { redirect } from "next/navigation";
 
-import { listEntriesBySnapshot } from "@/actions/entries";
 import { listExpenseCategories } from "@/actions/expense-categories";
 import { listGoals } from "@/actions/goals";
 import { listMembers } from "@/actions/members";
 import { getProfile } from "@/actions/profile";
-import { listSnapshots } from "@/actions/snapshots";
+import { getLatestTotalAssets, listSnapshots } from "@/actions/snapshots";
+import { AssetActionsProvider } from "@/components/asset-actions";
 import { HeaderActions } from "@/components/header-actions";
 import { MotionShell } from "@/components/motion-shell";
 import { ProfileMenu } from "@/components/profile-menu";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { ScrollEdgeChrome } from "@/components/scroll-edge-chrome";
+import { APP_HEADER_ID } from "@/lib/scroll-memory";
 import { getSession } from "@/lib/session";
 
 export default async function AppLayout({
@@ -25,25 +27,26 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  const [profile, snapshots, goals, members, categories] = await Promise.all([
-    getProfile(),
-    listSnapshots(),
-    listGoals(),
-    listMembers(),
-    listExpenseCategories(),
-  ]);
-
-  const latest = snapshots[0];
-  const latestEntries = latest ? await listEntriesBySnapshot(latest.id) : {};
-  const currentTotalAssets = Object.values(latestEntries).reduce(
-    (sum, entry) => sum + Number(entry.amount),
-    0,
-  );
+  const [profile, snapshots, goals, members, categories, currentTotalAssets] =
+    await Promise.all([
+      // A session can outlive its account (deleted on another device): send it to
+      // sign-in instead of an error page.
+      getProfile().catch(() => null),
+      listSnapshots(),
+      listGoals(),
+      listMembers(),
+      listExpenseCategories(),
+      getLatestTotalAssets(),
+    ]);
+  if (!profile) {
+    redirect("/login");
+  }
 
   return (
-    <>
+    <AssetActionsProvider>
       <PullToRefresh />
-      <header>
+      <ScrollEdgeChrome />
+      <header id={APP_HEADER_ID}>
         <div className="mx-auto flex min-h-22 max-w-7xl items-center justify-between gap-4 px-4 pt-5 pb-3 md:min-h-24 md:px-8 md:pt-7 md:pb-4">
           <ProfileMenu
             displayName={profile.displayName}
@@ -63,6 +66,6 @@ export default async function AppLayout({
         </div>
       </header>
       <MotionShell>{children}</MotionShell>
-    </>
+    </AssetActionsProvider>
   );
 }

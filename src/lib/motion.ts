@@ -47,3 +47,7 @@ export const STAGGER_INTERVAL = 0.04;
 // element reads as one surface arriving instead of two states swapping.
 export const ENTER_Y = 10;
 export const ENTER_BLUR = "blur(4px)";
+
+// Undo toasts stay up longer than status toasts: HIG asks to minimize time-boxed UI, and
+// an undo that vanishes before it can be read is no undo at all.
+export const UNDO_TOAST_MS = 8000;

@@ -2,13 +2,23 @@
 // Mutations are applied optimistically by the parent view, so submit handlers are synchronous.
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { seedDefaultExpenseCategories } from "@/actions/expense-categories";
 import type { ExpenseInput } from "@/actions/expenses";
 import type { RunExpenseAction } from "@/components/expense-view";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -20,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { getCategoryVisual } from "@/lib/category-visual";
+import { amountDigits, formatAmountInput } from "@/lib/format";
 import { SCOPE_SHARED } from "@/lib/expense-scope";
 import { DURATION_FAST, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -109,7 +120,9 @@ export function ExpenseComposer({
                 : { duration: DURATION_FAST, ease: EASE_OUT }
             }
           >
-            <Card className="gap-4 p-4 shadow-none ring-0 sm:p-5">
+            {/* Concentric with the capsule amount field in its corner: field radius 20
+                (h-10) + 16px padding (20px on sm+). */}
+            <Card className="gap-4 rounded-[2.25rem] p-4 shadow-none ring-0 sm:rounded-[2.5rem] sm:p-5">
               <ExpenseFields
                 draft={draft}
                 onChange={(patch) => setDraft({ ...draft, ...patch })}
@@ -189,34 +202,83 @@ export function ExpenseEditDialog({
   onDelete,
   onClose,
 }: EditDialogProps) {
+  const [dirty, setDirty] = useState(false);
+  const [canSave, setCanSave] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // The ✓ in the sheet bar saves through the body, which owns the draft.
+  const saveRef = useRef<(() => void) | null>(null);
+
+  // HIG (sheets): dismissing with unsaved changes — by swipe, tap outside, or Cancel —
+  // asks before throwing the edits away.
+  function requestClose() {
+    if (dirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  }
+
   return (
-    <Dialog
-      open={expense !== null}
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>지출 수정</DialogTitle>
-          <DialogDescription>
-            금액, 분류, 누가 쓴 지출인지 수정할 수 있습니다.
-          </DialogDescription>
-        </DialogHeader>
-        {expense ? (
-          <ExpenseEditBody
-            key={expense.id}
-            expense={expense}
-            categories={categories}
-            members={members}
-            runAction={runAction}
-            onSave={onSave}
-            onDelete={onDelete}
-            onClose={onClose}
-          />
-        ) : null}
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog
+        open={expense !== null}
+        onOpenChange={(next) => {
+          if (!next) requestClose();
+        }}
+      >
+        <DialogContent
+          className="sm:max-w-md"
+          onConfirm={() => saveRef.current?.()}
+          confirmDisabled={!canSave}
+          confirmLabel="저장"
+        >
+          <DialogHeader>
+            <DialogTitle>지출 수정</DialogTitle>
+            <DialogDescription>
+              금액, 분류, 누가 쓴 지출인지 수정할 수 있습니다.
+            </DialogDescription>
+          </DialogHeader>
+          {expense ? (
+            <ExpenseEditBody
+              key={expense.id}
+              expense={expense}
+              categories={categories}
+              members={members}
+              runAction={runAction}
+              onSave={onSave}
+              onDelete={onDelete}
+              onClose={onClose}
+              onDirtyChange={setDirty}
+              onCanSaveChange={setCanSave}
+              saveRef={saveRef}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>변경사항을 버릴까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              수정한 내용은 저장되지 않습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>계속 편집</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setDirty(false);
+                onClose();
+              }}
+            >
+              버리기
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -228,6 +290,9 @@ function ExpenseEditBody({
   onSave,
   onDelete,
   onClose,
+  onDirtyChange,
+  onCanSaveChange,
+  saveRef,
 }: {
   expense: Expense;
   categories: ExpenseCategory[];
@@ -236,14 +301,30 @@ function ExpenseEditBody({
   onSave: (input: ExpenseInput) => void;
   onDelete: () => void;
   onClose: () => void;
+  onDirtyChange: (dirty: boolean) => void;
+  onCanSaveChange: (canSave: boolean) => void;
+  saveRef: React.RefObject<(() => void) | null>;
 }) {
-  const [draft, setDraft] = useState<Draft>({
-    amountText: String(Number(expense.amount)),
+  const [initial] = useState<Draft>(() => ({
+    amountText: String(Math.round(Number(expense.amount))),
     categoryId: expense.category_id,
     memberKey: expense.member_id ?? SCOPE_SHARED,
     spentOn: expense.spent_on,
     memo: expense.memo ?? "",
-  });
+  }));
+  const [draft, setDraft] = useState<Draft>(initial);
+
+  const dirty =
+    draft.amountText !== initial.amountText ||
+    draft.categoryId !== initial.categoryId ||
+    draft.memberKey !== initial.memberKey ||
+    draft.spentOn !== initial.spentOn ||
+    draft.memo !== initial.memo;
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
+  // A closed (or replaced) editor leaves nothing to protect.
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
 
   function save() {
     const input = draftToInput(draft);
@@ -258,6 +339,13 @@ function ExpenseEditBody({
   }
 
   const canSave = draftToInput(draft) !== null;
+  useEffect(() => {
+    onCanSaveChange(canSave);
+  }, [canSave, onCanSaveChange]);
+  // Keep the sheet bar's ✓ pointed at the latest draft.
+  useEffect(() => {
+    saveRef.current = save;
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -272,26 +360,17 @@ function ExpenseEditBody({
         // keyboard over it; the user taps the field they actually want to change.
         autoFocusAmount={!prefersTouch()}
       />
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={remove}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="size-4" />
-          삭제
-        </Button>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-            취소
-          </Button>
-          <Button type="button" size="sm" disabled={!canSave} onClick={save}>
-            저장
-          </Button>
-        </div>
-      </div>
+      {/* Cancel/save live in the sheet bar (X / ✓); delete stays as the one in-content
+          action, a full-width destructive row like iOS detail sheets. */}
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={remove}
+        className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+      >
+        <Trash2 className="size-4" />
+        지출 삭제
+      </Button>
     </div>
   );
 }
@@ -323,9 +402,9 @@ function ExpenseFields({
           autoFocus={autoFocusAmount}
           inputMode="numeric"
           type="text"
-          value={draft.amountText}
+          value={formatAmountInput(draft.amountText)}
           onChange={(event) =>
-            onChange({ amountText: event.target.value.replace(/\D/g, "") })
+            onChange({ amountText: amountDigits(event.target.value) })
           }
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -333,8 +412,7 @@ function ExpenseFields({
               onSubmit();
             }
           }}
-          placeholder="금액 (원)"
-          maxLength={13}
+          placeholder="금액"
           className="h-10 flex-1 text-right text-base font-semibold tabular-nums placeholder:font-normal"
         />
         <Input
@@ -377,7 +455,7 @@ function ExpenseFields({
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-muted-foreground">
-              아직 카테고리가 없습니다.
+              카테고리가 없습니다
             </p>
             <Button
               type="button"
@@ -426,7 +504,8 @@ function ExpenseFields({
             onSubmit();
           }
         }}
-        placeholder="메모 (선택)"
+        placeholder="메모"
+        enterKeyHint="done"
         maxLength={80}
       />
     </div>
@@ -472,7 +551,8 @@ function Chip({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium",
+        // Taller on touch screens so a wrapped grid of chips stays comfortably tappable.
+        "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium pointer-coarse:px-3.5 pointer-coarse:py-2 pointer-coarse:text-[13px]",
         "transition-[background-color,color,border-color,scale] duration-150 ease-out active:scale-[0.96]",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         selected

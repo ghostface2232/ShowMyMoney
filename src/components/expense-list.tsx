@@ -12,6 +12,7 @@ import type { RunExpenseAction } from "@/components/expense-view";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDayLabel, formatKRW } from "@/lib/format";
 import { SPRING_SOFT } from "@/lib/motion";
+import { keyOf, type RenderKeys } from "@/lib/render-keys";
 import type { Expense, ExpenseCategory, Member } from "@/types/db";
 
 type DayGroup = {
@@ -22,6 +23,7 @@ type DayGroup = {
 
 type Props = {
   expenses: Expense[];
+  renderKeys: RenderKeys;
   categories: ExpenseCategory[];
   members: Member[];
   runAction: RunExpenseAction;
@@ -32,6 +34,7 @@ type Props = {
 
 export function ExpenseList({
   expenses,
+  renderKeys,
   categories,
   members,
   runAction,
@@ -101,7 +104,7 @@ export function ExpenseList({
                 <AnimatePresence initial={false} mode="popLayout">
                   {group.expenses.map((expense) => (
                     <motion.li
-                      key={expense.id}
+                      key={keyOf(renderKeys, expense.id)}
                       layout
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}

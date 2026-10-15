@@ -96,12 +96,12 @@ function ChartOrEmpty({
 }) {
   if (series.length === 0) {
     return (
-      <EmptyState message="아직 그룹이 없습니다. 그룹과 항목을 추가하면 월별 추이가 표시됩니다." />
+      <EmptyState message="그룹이 없습니다" />
     );
   }
   if (data.length === 0) {
     return (
-      <EmptyState message="아직 비교할 수 있는 기록이 부족합니다. 스냅샷이 두 개 이상 쌓이면 표시됩니다." />
+      <EmptyState message="두 달 이상 기록되면 표시됩니다" />
     );
   }
   return <GrowthChart data={data} series={series} />;

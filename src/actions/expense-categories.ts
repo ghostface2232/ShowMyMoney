@@ -67,6 +67,7 @@ export async function createExpenseCategory(name: string): Promise<Result> {
   const accountId = await requireAccount();
   const trimmed = name.trim();
   if (trimmed.length === 0) return { ok: false, error: "이름을 입력하세요." };
+  if (trimmed.length > 40) return { ok: false, error: "이름은 40자 이하로 입력하세요." };
 
   const supabase = getSupabaseAdmin();
   const { data: tail, error: tailError } = await supabase
@@ -94,6 +95,7 @@ export async function renameExpenseCategory(
   const accountId = await requireAccount();
   const trimmed = name.trim();
   if (trimmed.length === 0) return { ok: false, error: "이름을 입력하세요." };
+  if (trimmed.length > 40) return { ok: false, error: "이름은 40자 이하로 입력하세요." };
 
   const supabase = getSupabaseAdmin();
   if (!(await isCategoryOwnedBy(supabase, accountId, categoryId))) {

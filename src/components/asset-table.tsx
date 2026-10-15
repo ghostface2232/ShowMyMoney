@@ -42,7 +42,10 @@ import type {
   SnapshotWithEntries,
 } from "@/actions/dashboard";
 import { deleteEntry, upsertEntry } from "@/actions/entries";
-import { createSnapshot } from "@/actions/snapshots";
+import {
+  createSnapshot,
+  deleteSnapshot as deleteSnapshotAction,
+} from "@/actions/snapshots";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,14 +61,31 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { YearMonthPicker } from "@/components/year-month-picker";
-import { formatKRW, formatYearMonth } from "@/lib/format";
-import { DURATION_BASE, EASE_OUT, SPRING_SOFT } from "@/lib/motion";
+import {
+  amountDigits,
+  formatAmountInput,
+  formatKRW,
+  formatYearMonth,
+} from "@/lib/format";
+import {
+  DURATION_BASE,
+  EASE_OUT,
+  SPRING_SOFT,
+  UNDO_TOAST_MS,
+} from "@/lib/motion";
+import {
+  keyOf,
+  NO_RENDER_KEYS,
+  withAlias,
+  type RenderKeys,
+} from "@/lib/render-keys";
 import { replaceEqualDeep } from "@/lib/structural-sharing";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types/db";
@@ -100,6 +120,7 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [localDashboard, setLocalDashboardState] = useState(dashboard);
+  const [renderKeys, setRenderKeys] = useState<RenderKeys>(NO_RENDER_KEYS);
   const localDashboardRef = useRef(dashboard);
   const serverDashboardRef = useRef(dashboard);
   const pendingBackgroundCountRef = useRef(0);
@@ -171,13 +192,31 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
 
     function addSnapshot(yearMonth: number) {
       const tempId = createTempId("snapshot");
+      const now = new Date().toISOString();
+      // The server seeds a new month with the closest earlier month's amounts; mirror
+      // that locally so the column (and the totals) don't flash 0원 meanwhile.
+      const previous = localDashboardRef.current.snapshots.find(
+        (snapshot) => snapshot.year_month < yearMonth,
+      );
+      const copiedEntries: SnapshotWithEntries["entriesByCategory"] = {};
+      for (const [categoryId, entry] of Object.entries(
+        previous?.entriesByCategory ?? {},
+      )) {
+        copiedEntries[categoryId] = {
+          ...entry,
+          id: createTempId("entry"),
+          snapshot_id: tempId,
+          created_at: now,
+          updated_at: now,
+        };
+      }
       const tempSnapshot: SnapshotWithEntries = {
         id: tempId,
         account_id: "",
         year_month: yearMonth,
         note: null,
-        created_at: new Date().toISOString(),
-        entriesByCategory: {},
+        created_at: now,
+        entriesByCategory: copiedEntries,
       };
 
       setLocalDashboard((current) => ({
@@ -187,18 +226,36 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
         ),
       }));
       runInBackground(createSnapshot(yearMonth), (result) => {
+        setRenderKeys((keys) => withAlias(keys, result.snapshot.id, tempId));
+        if (result.copyFailed) {
+          toast.error("이전 달 금액을 가져오지 못했습니다.");
+        }
+        const entriesByCategory: SnapshotWithEntries["entriesByCategory"] = {};
+        for (const entry of result.entries) {
+          entriesByCategory[entry.category_id] = entry;
+        }
         setLocalDashboard((current) => ({
           ...current,
           snapshots: current.snapshots.map((snapshot) =>
             snapshot.id === tempId
-              ? {
-                  ...result.snapshot,
-                  entriesByCategory: snapshot.entriesByCategory,
-                }
+              ? { ...result.snapshot, entriesByCategory }
               : snapshot,
           ),
         }));
       });
+    }
+
+    function deleteSnapshot(snapshotId: string) {
+      // A month still waiting for its server id can't be deleted yet; the header only
+      // offers months the server already knows about.
+      if (isOptimisticId(snapshotId)) return;
+      setLocalDashboard((current) => ({
+        ...current,
+        snapshots: current.snapshots.filter(
+          (snapshot) => snapshot.id !== snapshotId,
+        ),
+      }));
+      runInBackground(deleteSnapshotAction(snapshotId));
     }
 
     const actions: TableActions = {
@@ -220,6 +277,7 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
           categoryTree: [...current.categoryTree, tempGroup],
         }));
         runInBackground(createGroup(trimmed), (result) => {
+          setRenderKeys((keys) => withAlias(keys, result.group.id, tempId));
           setLocalDashboard((current) => ({
             ...current,
             categoryTree: current.categoryTree.map((group) =>
@@ -286,6 +344,7 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
           ),
         }));
         runInBackground(createCategory(groupId, trimmed), (result) => {
+          setRenderKeys((keys) => withAlias(keys, result.category.id, tempId));
           setLocalDashboard((current) => ({
             ...current,
             categoryTree: current.categoryTree.map((item) =>
@@ -432,6 +491,11 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
         if (!location) return;
         const key = cellKey(location.snapshotId, location.categoryId);
         bumpCellGeneration(cellGenerationRef.current, key);
+        const removedAmount = Number(
+          localDashboardRef.current.snapshots.find(
+            (snapshot) => snapshot.id === location.snapshotId,
+          )?.entriesByCategory[location.categoryId]?.amount ?? 0,
+        );
 
         setLocalDashboard((current) => ({
           ...current,
@@ -448,28 +512,48 @@ export function useOptimisticDashboard(dashboard: DashboardData) {
           ),
         }));
 
+        // Undo instead of a confirmation step (HIG: no alerts for common, undoable
+        // actions): restoring is just re-upserting the amount. Offered once the delete
+        // has actually succeeded, so undo can't duplicate a row that came back.
+        const offerUndo = () =>
+          toast("금액을 지웠습니다.", {
+            duration: UNDO_TOAST_MS,
+            action: {
+              label: "되돌리기",
+              onClick: () =>
+                actions.upsertEntry(
+                  location.snapshotId,
+                  location.categoryId,
+                  removedAmount,
+                ),
+            },
+          });
+
         if (isOptimisticId(entryId)) {
           cellDeletionPendingRef.current.add(key);
+          offerUndo();
           return;
         }
-        runInBackground(deleteEntry(entryId));
+        runInBackground(deleteEntry(entryId), offerUndo);
       },
     };
 
-    return { actions, addSnapshot };
+    return { actions, addSnapshot, deleteSnapshot };
   }, [router, startTransition]);
 
-  return { dashboard: localDashboard, ...api };
+  return { dashboard: localDashboard, renderKeys, ...api };
 }
 
 const INSTANT: Transition = { duration: 0 };
 
 export function AssetTable({
   dashboard,
+  renderKeys,
   actions,
   onAddSnapshot,
 }: {
   dashboard: DashboardData;
+  renderKeys: RenderKeys;
   actions: TableActions;
   onAddSnapshot: (yearMonth: number) => void;
 }) {
@@ -492,7 +576,8 @@ export function AssetTable({
           {hasGroups ? (
             dashboard.categoryTree.map((group) => (
               <GroupSection
-                key={group.id}
+                key={keyOf(renderKeys, group.id)}
+                renderKeys={renderKeys}
                 group={group}
                 snapshots={dashboard.snapshots}
                 transition={transition}
@@ -529,11 +614,12 @@ function EmptyState({
           <Plus className="size-5" strokeWidth={2.2} />
         </span>
         <p className="text-sm text-muted-foreground">
-          아직 기록이 없습니다. 첫 달을 추가해 보세요.
+          기록이 없습니다
         </p>
         <YearMonthPicker
           existing={existing}
           onSelect={onSelect}
+          title="첫 달 추가"
           trigger={
             <Button size="sm">
               <Plus className="size-4" />첫 달 추가
@@ -549,7 +635,7 @@ function EmptyGroupsHint() {
   return (
     <Card className="shadow-none ring-0">
       <CardContent className="py-10 text-center text-sm text-muted-foreground">
-        그룹이 없습니다. 아래에서 새 그룹을 추가해 보세요.
+        그룹이 없습니다
       </CardContent>
     </Card>
   );
@@ -594,6 +680,7 @@ function AddGroupRow({
 
 type GroupSectionProps = {
   group: CategoryGroupWithCategories;
+  renderKeys: RenderKeys;
   snapshots: SnapshotWithEntries[];
   transition: Transition;
   actions: TableActions;
@@ -603,6 +690,7 @@ type GroupSectionProps = {
 // re-renders only its own column, so Motion's layout measurement stays O(1) per edit.
 const GroupSection = memo(function GroupSection({
   group,
+  renderKeys,
   snapshots,
   transition,
   actions,
@@ -613,7 +701,11 @@ const GroupSection = memo(function GroupSection({
         <h2 className="min-w-0 truncate px-1 text-xl font-semibold tracking-tight">
           {group.name}
         </h2>
-        <GroupManagementDialog group={group} actions={actions} />
+        <GroupManagementDialog
+          group={group}
+          renderKeys={renderKeys}
+          actions={actions}
+        />
       </div>
 
       <Card className="p-4 shadow-none ring-0">
@@ -625,7 +717,7 @@ const GroupSection = memo(function GroupSection({
               <AnimatePresence mode="popLayout" initial={false}>
                 {snapshots.map((snap, index) => (
                   <SnapshotColumn
-                    key={snap.id}
+                    key={keyOf(renderKeys, snap.id)}
                     snapshot={snap}
                     categories={group.categories}
                     actions={actions}
@@ -708,9 +800,11 @@ function TableRowDividers({ rowCount }: { rowCount: number }) {
 
 function GroupManagementDialog({
   group,
+  renderKeys,
   actions,
 }: {
   group: CategoryGroupWithCategories;
+  renderKeys: RenderKeys;
   actions: TableActions;
 }) {
   const [open, setOpen] = useState(false);
@@ -736,6 +830,10 @@ function GroupManagementDialog({
     setNewCategory("");
     actions.createCategory(group.id, trimmed);
   }
+
+  const hasUnsavedCategory = group.categories.some((category) =>
+    isOptimisticId(category.id),
+  );
 
   function moveCategory(categoryId: string, direction: -1 | 1) {
     const index = group.categories.findIndex((cat) => cat.id === categoryId);
@@ -771,15 +869,30 @@ function GroupManagementDialog({
             type="button"
             variant="ghost"
             size="icon-sm"
+            // Managing a group that isn't saved yet would target an id the server rejects.
+            disabled={isOptimisticId(group.id)}
             className="size-7 shrink-0 rounded-full bg-foreground/7 text-muted-foreground sm:size-6"
             aria-label={`${group.name} 관리`}
           >
             <MoreHorizontal className="size-3.5" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg">
-          <DialogHeader className="items-start pr-10">
+        <DialogContent
+          className="overflow-hidden sm:max-h-[calc(100vh-2rem)] sm:max-w-lg"
+          // Edits here apply as they happen; ✓ commits a field still being typed in
+          // (renames save on blur) and closes.
+          onConfirm={() => {
+            if (document.activeElement instanceof HTMLElement) {
+              document.activeElement.blur();
+            }
+            setOpen(false);
+          }}
+        >
+          <DialogHeader>
             <EditableDialogTitle value={group.name} onSave={saveGroupName} />
+            <DialogDescription className="sr-only">
+              그룹 이름과 항목, 항목 순서를 관리합니다.
+            </DialogDescription>
           </DialogHeader>
 
           <motion.div
@@ -806,10 +919,15 @@ function GroupManagementDialog({
                   <AnimatePresence initial={false}>
                     {group.categories.map((category, index) => (
                       <GroupCategoryRow
-                        key={category.id}
+                        key={keyOf(renderKeys, category.id)}
                         category={category}
-                        canMoveUp={index > 0}
-                        canMoveDown={index < group.categories.length - 1}
+                        locked={isOptimisticId(category.id)}
+                        // Reordering sends every id; wait until all rows are saved.
+                        canMoveUp={index > 0 && !hasUnsavedCategory}
+                        canMoveDown={
+                          index < group.categories.length - 1 &&
+                          !hasUnsavedCategory
+                        }
                         transition={transition}
                         onRename={(name) =>
                           actions.renameCategory(category.id, name)
@@ -837,7 +955,7 @@ function GroupManagementDialog({
                   transition={transition}
                   className="rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground"
                 >
-                  아직 항목이 없습니다.
+                  항목이 없습니다
                 </motion.div>
               )}
 
@@ -852,6 +970,7 @@ function GroupManagementDialog({
                     }
                   }}
                   placeholder="새 항목 이름"
+                  enterKeyHint="done"
                   maxLength={40}
                   className={`h-8 px-3 ${INPUT_NO_FOCUS_RING}`}
                 />
@@ -916,6 +1035,7 @@ function GroupManagementDialog({
 
 function GroupCategoryRow({
   category,
+  locked,
   canMoveUp,
   canMoveDown,
   transition,
@@ -924,6 +1044,7 @@ function GroupCategoryRow({
   onDelete,
 }: {
   category: Category;
+  locked: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
   transition: Transition;
@@ -950,6 +1071,7 @@ function GroupCategoryRow({
     >
       <Input
         key={category.name}
+        disabled={locked}
         defaultValue={category.name}
         onBlur={(event) => {
           if (!event.currentTarget.value.trim()) {
@@ -975,7 +1097,7 @@ function GroupCategoryRow({
         type="button"
         variant="ghost"
         size="icon-sm"
-        disabled={!canMoveUp}
+        disabled={locked || !canMoveUp}
         onClick={() => onMove(-1)}
         aria-label={`${category.name} 위로 이동`}
       >
@@ -985,7 +1107,7 @@ function GroupCategoryRow({
         type="button"
         variant="ghost"
         size="icon-sm"
-        disabled={!canMoveDown}
+        disabled={locked || !canMoveDown}
         onClick={() => onMove(1)}
         aria-label={`${category.name} 아래로 이동`}
       >
@@ -995,6 +1117,7 @@ function GroupCategoryRow({
         type="button"
         variant="ghost"
         size="icon-sm"
+        disabled={locked}
         onClick={onDelete}
         className="text-muted-foreground hover:text-destructive"
         aria-label={`${category.name} 삭제`}
@@ -1037,7 +1160,7 @@ function EditableDialogTitle({
     return (
       <DialogTitle
         asChild
-        className="w-full min-w-0 text-3xl font-semibold leading-tight sm:w-2/3"
+        className="w-full min-w-0"
       >
         <input
           autoFocus
@@ -1054,7 +1177,7 @@ function EditableDialogTitle({
             }
           }}
           maxLength={40}
-          className="cursor-text rounded bg-transparent px-0 outline-none"
+          className="h-9 w-full cursor-text rounded bg-transparent px-0 text-center outline-none"
         />
       </DialogTitle>
     );
@@ -1063,12 +1186,12 @@ function EditableDialogTitle({
   return (
     <DialogTitle
       asChild
-      className="w-full min-w-0 text-3xl font-semibold leading-tight sm:max-w-[66%]"
+      className="w-full min-w-0"
     >
       <button
         type="button"
         onClick={start}
-        className="cursor-pointer truncate rounded px-1 text-left"
+        className="h-9 cursor-pointer truncate rounded px-1 text-center"
       >
         {value}
       </button>
@@ -1079,9 +1202,9 @@ function EditableDialogTitle({
 function getGroupDeleteMessage(target: GroupDeleteTarget | null): string {
   if (!target) return "";
   if (target.kind === "group") {
-    return `"${target.name}" 그룹과 하위 ${target.categoryCount}개 항목, 그리고 관련된 모든 금액 기록이 삭제됩니다.`;
+    return `"${target.name}"의 항목 ${target.categoryCount}개와 금액 기록이 함께 삭제됩니다.`;
   }
-  return `"${target.name}" 항목과 관련된 모든 금액 기록이 삭제됩니다.`;
+  return `"${target.name}"의 금액 기록이 함께 삭제됩니다.`;
 }
 
 type SnapshotColumnProps = {
@@ -1155,6 +1278,9 @@ const SnapshotColumn = memo(function SnapshotColumn({
           categoryId={cat.id}
           entry={snapshot.entriesByCategory[cat.id]}
           actions={actions}
+          // A month or row still waiting for its server id can't take amounts yet: the
+          // write would be rejected and roll back every pending change with it.
+          locked={isOptimisticId(snapshot.id) || isOptimisticId(cat.id)}
         />
       ))}
 
@@ -1170,6 +1296,7 @@ type AmountCellProps = {
   categoryId: string;
   entry: SnapshotWithEntries["entriesByCategory"][string] | undefined;
   actions: TableActions;
+  locked: boolean;
 };
 
 const AmountCell = memo(function AmountCell({
@@ -1177,13 +1304,15 @@ const AmountCell = memo(function AmountCell({
   categoryId,
   entry,
   actions,
+  locked,
 }: AmountCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const amount = entry?.amount ?? null;
 
   function start() {
-    setDraft(amount !== null ? String(amount) : "");
+    if (locked) return;
+    setDraft(amount !== null ? String(Math.round(Number(amount))) : "");
     setEditing(true);
   }
 
@@ -1216,8 +1345,8 @@ const AmountCell = memo(function AmountCell({
           autoFocus
           inputMode="numeric"
           type="text"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value.replace(/\D/g, ""))}
+          value={formatAmountInput(draft)}
+          onChange={(event) => setDraft(amountDigits(event.target.value))}
           onBlur={commit}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -1252,7 +1381,9 @@ const AmountCell = memo(function AmountCell({
     <button
       type="button"
       onClick={start}
-      className="group/cell flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      disabled={locked}
+      aria-busy={locked || undefined}
+      className="group/cell flex h-11 w-full cursor-pointer items-center justify-end px-3 text-right text-sm tabular-nums transition-[color,opacity] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:cursor-default disabled:opacity-50"
     >
       {amount !== null ? (
         formatKRW(amount)
@@ -1302,6 +1433,7 @@ function InlineNameInput({
       onBlur={commit}
       onKeyDown={onKeyDown}
       placeholder={placeholder}
+      enterKeyHint="done"
       maxLength={40}
       className="cursor-text rounded bg-transparent px-1 text-left text-sm outline-none ring-1 ring-ring/60 ring-inset placeholder:text-muted-foreground/60"
     />
