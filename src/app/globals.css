@@ -189,8 +189,8 @@
   border-radius: 0 !important;
 }
 
-/* Liquid Glass sheet-bar buttons (DialogHeader). Neutral glass: a faint fill with a
-   hairline edge and a shadow that hugs the circle (no inset highlight or offset halo). Tinted (✓ with something
+/* Liquid Glass sheet-bar buttons (DialogHeader). Neutral glass: a faint fill with a shadow
+   that hugs the circle (no inset outline, highlight or offset halo). Tinted (✓ with something
    to save): the brand fill. Disabled ✓ keeps the neutral glass and fades only the glyph,
    as iOS does, instead of dimming the whole control. */
 .sheet-glass {
@@ -199,7 +199,6 @@
   background-clip: border-box;
   background-color: oklch(0.955 0 0 / 0.9);
   box-shadow:
-    inset 0 0 0 0.5px oklch(0 0 0 / 0.06),
     0 1px 2px oklch(0 0 0 / 0.06),
     0 2px 8px oklch(0 0 0 / 0.05);
   transition-property: background-color, color, box-shadow, scale;
@@ -214,10 +213,12 @@
 .sheet-glass[data-tinted] {
   background-color: var(--primary);
   color: var(--primary-foreground);
+  /* Lit-glass treatment: a light top edge inside the fill and a soft brand-colored halo.
+     No inset outline on either button — it reads as an inner ring. */
   box-shadow:
-    inset 0 0 0 0.5px oklch(0 0 0 / 0.08),
+    inset 0 1px 0 oklch(1 0 0 / 0.35),
     0 1px 2px oklch(0 0 0 / 0.08),
-    0 2px 10px color-mix(in oklab, var(--primary) 30%, transparent);
+    0 6px 16px -6px color-mix(in oklab, var(--primary) 55%, transparent);
 }
 @media (hover: hover) {
   .sheet-glass[data-tinted]:not(:disabled):hover {
