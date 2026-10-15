@@ -7,11 +7,11 @@ export default function ExpensesLoading() {
         <div className="h-8 w-40 animate-pulse rounded-lg bg-muted" />
         <div className="h-4 w-10 animate-pulse rounded-md bg-muted" />
       </div>
-      <div className="h-40 animate-pulse rounded-4xl bg-muted sm:h-28" />
-      <div className="h-44 animate-pulse rounded-4xl bg-muted" />
+      <div className="h-40 animate-pulse squircle-mask rounded-4xl bg-muted sm:h-28" />
+      <div className="h-44 animate-pulse squircle-mask rounded-4xl bg-muted" />
       <div className="space-y-3">
-        <div className="h-16 animate-pulse rounded-4xl bg-muted" />
-        <div className="h-56 animate-pulse rounded-4xl bg-muted" />
+        <div className="h-16 animate-pulse squircle-mask rounded-4xl bg-muted" />
+        <div className="h-56 animate-pulse squircle-mask rounded-4xl bg-muted" />
       </div>
     </main>
   );

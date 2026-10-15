@@ -167,7 +167,7 @@ export function ExpenseComposer({
                 : { duration: DURATION_FAST, ease: EASE_OUT }
             }
             className={cn(
-              "flex w-full cursor-pointer items-center gap-3 rounded-4xl bg-card p-3 text-left text-sm font-medium text-muted-foreground transition-[color,scale] duration-150 ease-out active:scale-[0.97]",
+              "flex w-full cursor-pointer items-center gap-3 squircle rounded-4xl bg-card p-3 text-left text-sm font-medium text-muted-foreground transition-[color,scale] duration-150 ease-out active:scale-[0.97]",
               "hover:text-foreground",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
             )}

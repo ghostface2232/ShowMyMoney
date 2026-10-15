@@ -170,3 +170,21 @@
     -webkit-backdrop-filter: none;
   }
 }
+
+/* Continuous (squircle) corners: superellipse(1.35) sits between a plain arc (1) and a full
+   squircle (2), close to iOS's continuous corner curve. `.squircle` applies it natively where
+   CSS corner-shape exists; `.squircle-mask` additionally gets an emulated clip-path from
+   SquircleCorners on engines without it (iOS Safari as of Safari 27). Never put either on
+   capsules or circles — a squircle end cap reads as a flattened pill. */
+@supports (corner-shape: superellipse(1.35)) {
+  .squircle,
+  .squircle-mask {
+    corner-shape: superellipse(1.35);
+  }
+}
+
+/* Emulated squircles (see SquircleCorners): the clip-path draws the corners, so the box
+   itself must be square or the superellipse's outer bulge would show nothing. */
+[data-squircle-emulated] {
+  border-radius: 0 !important;
+}

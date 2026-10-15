@@ -110,7 +110,7 @@ function DialogContent({
           // Mobile-first: an iOS-style bottom sheet. Slides in fully with the drawer curve,
           // rides on top of the on-screen keyboard (--keyboard-inset from ViewportSync) and
           // caps its height to the visible viewport so nothing hides behind the keyboard.
-          "fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] z-50 grid max-h-[calc(var(--visual-viewport-height,100dvh)-3rem)] w-full gap-6 overflow-y-auto overscroll-contain rounded-t-[var(--sheet-radius)] [--sheet-radius:2.375rem] bg-popover p-6 pb-[max(calc(env(safe-area-inset-bottom)-var(--keyboard-inset,0px)),1.5rem)] text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 outline-none",
+          "fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] z-50 grid max-h-[calc(var(--visual-viewport-height,100dvh)-3rem)] w-full gap-6 overflow-y-auto overscroll-contain squircle-mask rounded-t-[var(--sheet-radius)] [--sheet-radius:2.375rem] bg-popover p-6 pb-[max(calc(env(safe-area-inset-bottom)-var(--keyboard-inset,0px)),1.5rem)] text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 outline-none",
           "transition-[bottom,max-height] duration-250 ease-[cubic-bezier(0.32,0.72,0,1)] animation-duration-[420ms] data-open:animate-in data-open:slide-in-from-bottom-full data-closed:animate-out data-closed:slide-out-to-bottom-full data-closed:animation-duration-[280ms]",
           // Reduce Motion: fade the sheet in place instead of sliding it (HIG).
           "motion-reduce:data-open:slide-in-from-bottom-0 motion-reduce:data-open:fade-in-0 motion-reduce:data-closed:slide-out-to-bottom-0 motion-reduce:data-closed:fade-out-0",

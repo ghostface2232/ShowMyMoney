@@ -49,7 +49,7 @@ export function ProfileMenu({ displayName, firstUsedAt }: Props) {
       <button
         type="button"
         onClick={() => setProfileOpen(true)}
-        className="group -m-1.5 flex min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded-2xl p-1.5 text-left transition-[background-color,scale] duration-150 ease-out select-none hover:bg-foreground/4 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="group -m-1.5 flex min-w-0 cursor-pointer flex-col items-start gap-0.5 squircle rounded-2xl p-1.5 text-left transition-[background-color,scale] duration-150 ease-out select-none hover:bg-foreground/4 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         aria-label="프로필 설정 열기"
       >
         <span className="block max-w-[min(60vw,24rem)] truncate text-[13px] font-medium text-muted-foreground">

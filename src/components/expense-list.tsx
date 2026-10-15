@@ -180,7 +180,7 @@ const ExpenseRow = memo(function ExpenseRow({
       type="button"
       onClick={() => onSelect(expense)}
       disabled={disabled}
-      className="flex w-full items-center gap-3 rounded-[1.25rem] px-2.5 py-2 text-left transition-[background-color,scale] duration-150 ease-out hover:bg-muted/40 active:scale-[0.98] active:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:opacity-60"
+      className="flex w-full items-center gap-3 squircle rounded-[1.25rem] px-2.5 py-2 text-left transition-[background-color,scale] duration-150 ease-out hover:bg-muted/40 active:scale-[0.98] active:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:opacity-60"
     >
       <CategoryIcon
         categoryId={expense.category_id}

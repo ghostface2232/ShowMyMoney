@@ -6,6 +6,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { TabBar } from "@/components/tab-bar";
 import { Toaster } from "@/components/ui/sonner";
+import { SquircleCorners } from "@/components/squircle-corners";
 import { ViewportSync } from "@/components/viewport-sync";
 import { SCROLL_CONTAINER_ID } from "@/lib/scroll-memory";
 
@@ -76,6 +77,7 @@ export default function RootLayout({
             or behind the keyboard. */}
         <Toaster position="top-center" />
         <ViewportSync />
+        <SquircleCorners />
       </body>
     </html>
   );

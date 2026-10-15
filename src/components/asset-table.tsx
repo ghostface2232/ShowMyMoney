@@ -953,7 +953,7 @@ function GroupManagementDialog({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                   transition={transition}
-                  className="rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground"
+                  className="squircle rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground"
                 >
                   항목이 없습니다
                 </motion.div>

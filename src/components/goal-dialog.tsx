@@ -332,7 +332,7 @@ function CurrentAssetsHeader({
 }) {
   if (!hasSnapshot) {
     return (
-      <div className="rounded-2xl border border-dashed bg-muted/40 px-4 py-5 text-center text-sm text-muted-foreground">
+      <div className="squircle rounded-2xl border border-dashed bg-muted/40 px-4 py-5 text-center text-sm text-muted-foreground">
         월별 기록을 추가하면 달성률을 계산합니다
       </div>
     );
@@ -351,7 +351,7 @@ function CurrentAssetsHeader({
 
 function EmptyGoals() {
   return (
-    <div className="rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground">
+    <div className="squircle rounded-2xl border border-dashed py-6 text-center text-sm text-muted-foreground">
       목표가 없습니다
     </div>
   );
@@ -396,7 +396,7 @@ function GoalItem({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-2xl border bg-card p-4",
+        "flex flex-col gap-3 squircle rounded-2xl border bg-card p-4",
         status === "overdue" && "border-destructive/30",
       )}
     >
@@ -533,7 +533,7 @@ function GoalForm({
         if (pending) return;
         onSubmit();
       }}
-      className="flex flex-col gap-2 rounded-2xl border bg-card p-4"
+      className="flex flex-col gap-2 squircle rounded-2xl border bg-card p-4"
     >
       <Input
         autoFocus

@@ -499,7 +499,7 @@ function ManagementSection({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={transition}
-          className="flex flex-col items-center gap-3 rounded-2xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground"
+          className="flex flex-col items-center gap-3 squircle rounded-2xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground"
         >
           {emptyMessage}
           {emptyExtra}
